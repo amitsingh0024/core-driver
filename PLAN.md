@@ -72,3 +72,13 @@ On Pyra (P2) a realistic entry rig now gets ~0.8 tanks from cells per dive (was 
 - **Auto-pause** when the tab is hidden or the window loses focus. Audio is suspended while the tab is hidden.
 - **Reduced Motion setting:** defaults to the OS preference. It turns off shake, flattens CSS animation and shortens transitions.
 - **Page:** favicon, meta description and theme colour.
+
+## 7. Surface Base & Mine Look (Oct 2026)
+Reference: Coal LLC, with its readable side-on mine and a company yard on top.
+- **Wider mine:** `WORLD_COLS` went from 21 to 45. The camera eases after the pod on both axes and clamps to the world edges, so the screen is all ground with no dark side bars. It frames more of the yard while the pod sits at the surface.
+- **Surface yard (`render/SurfaceBase.ts`):** a daylight sky per planet with drifting clouds, sun or moon, and two parallax hill bands. The yard has an office ("CORE DIVER CO."), a fuel tower and pump, a derrick straddling the shaft mouth with a spinning sheave, an ore depot with a running conveyor, a garage, lamps, trees, fences and four workers pacing. There is a grass, snow or ash lip along the ground. The title screen shows the same yard with a slow pan.
+- **Seamless rock (`render/rockTiles.ts`):** sheet tiles are cropped inside their baked rim, and each row and column is rescaled to the tile's mean brightness, then mirrored per tile by hash. The rock reads as one face instead of a grid. Strata blend over a few rows with jitter instead of meeting on a ruled line.
+- **Tunnels:** dug tiles show a darkened back wall with soft shadows from the rock around them. Rock edges get a lit top lip and darker undersides.
+- **Ore in pockets:** ore chance is scaled by smooth value noise (mean of about 1), so ore forms clusters. Ore share is about 24% of tiles. Ore and pickups draw at about 75% size with a small offset and a contact shadow, so they sit in the rock.
+- **Lighting:** daylight fades over the first 14 rows into darkness that deepens each stratum. The pod lamp and forward beam cut it open, with a warm tint. Fuel cells, relics, beacons and the core glow through the dark. Dust drifts in the lamp light.
+- **Readability:** ore popups are now just "+$value" (plus "2× ORE"), armored veins use riveted steel bands, and the surface drill prompt sits on a pill. On short landscape phones the controls bar hides and the tips take over.

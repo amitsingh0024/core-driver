@@ -76,9 +76,9 @@ export class SpriteAtlas {
   private async loadTransparentPNGSheets(): Promise<void> {
     try {
       const [podsImg, oresImg, rocksImg] = await Promise.all([
-        this.loadImage('/sprites/drill_pods_hd.png'),
-        this.loadImage('/sprites/ores_gems_hd.png'),
-        this.loadImage('/sprites/strata_rocks_hd.png'),
+        this.loadImage('sprites/drill_pods_hd.png'),
+        this.loadImage('sprites/ores_gems_hd.png'),
+        this.loadImage('sprites/strata_rocks_hd.png'),
       ]);
 
       // 1. Slice 3 Drill Pods (192x256 master size each in 576x256 sheet)
@@ -141,10 +141,6 @@ export class SpriteAtlas {
             ctx.fillRect(0, 0, HD_SIZE, HD_SIZE);
             ctx.globalCompositeOperation = 'source-over';
           }
-
-          ctx.strokeStyle = 'rgba(8, 10, 16, 0.38)';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(1.5, 1.5, HD_SIZE - 3, HD_SIZE - 3);
 
           this.blockTiles.set(stratum.id, c);
           if (sIdx === 4) {

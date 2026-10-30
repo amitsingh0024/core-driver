@@ -1,7 +1,7 @@
 import { ORES } from '../config/ores';
 import { GameContext } from '../core/GameContext';
 import { DiveInput } from '../core/Input';
-import { DiveWorld, TILE_SIZE, WORLD_COLS } from '../game/DiveWorld';
+import { DiveWorld } from '../game/DiveWorld';
 import { DrillPod } from '../game/DrillPod';
 import { GameFeel } from '../game/GameFeel';
 import { DiveContract, ContractProgress, contractProgress, contractProgressText, rollContract } from '../game/DiveContract';
@@ -107,6 +107,7 @@ export class DiveScreen {
 
     this.input.clear();
     this.setPaused(false);
+    this.renderer.resetCamera();
     PortalSDK.gameplayStart();
     this.updateDiveHUD();
   }
@@ -174,14 +175,9 @@ export class DiveScreen {
 
     let pointerWorldPos: { x: number; y: number } | null = null;
     if (this.input.pointerDown) {
-      const w = this.canvas.clientWidth;
-      const h = this.canvas.clientHeight;
-      const worldPixelWidth = WORLD_COLS * TILE_SIZE;
-      const camX = worldPixelWidth * 0.5 - w * 0.5;
-      const camY = this.pod.y - h * 0.38;
       pointerWorldPos = {
-        x: this.input.pointerX + camX,
-        y: this.input.pointerY + camY,
+        x: this.input.pointerX + this.renderer.camX,
+        y: this.input.pointerY + this.renderer.camY,
       };
     }
 

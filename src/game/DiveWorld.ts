@@ -2,7 +2,7 @@ import { PlanetConfig, StratumConfig } from '../config/planets';
 import { ORES } from '../config/ores';
 
 export const TILE_SIZE = 44;
-export const WORLD_COLS = 21;
+export const WORLD_COLS = 45;
 export const METERS_PER_ROW = 4;
 
 export type BlockType = 'empty' | 'rock' | 'fuel_cell' | 'beacon' | 'relic' | 'core' | 'bedrock';
@@ -45,13 +45,37 @@ export class DiveWorld {
   public totalCoreMaxHp = 0;
   public currentCoreHp = 0;
   private seed: number;
+  private pocketSeed: number;
 
   constructor(planet: PlanetConfig, seed = Date.now()) {
     this.planet = planet;
     this.seed = seed;
+    this.pocketSeed = seed % 100003;
     this.totalRows = Math.ceil(planet.maxDepth / METERS_PER_ROW) + 6;
     this.coreStartRow = Math.floor(planet.maxDepth / METERS_PER_ROW) - 2;
     this.generateWorld();
+  }
+
+  /** Smooth value noise (cells of 4 tiles), squared and scaled so its mean is 1. */
+  private orePocket(gx: number, gy: number): number {
+    const cell = 4;
+    const fx = gx / cell;
+    const fy = gy / cell;
+    const x0 = Math.floor(fx);
+    const y0 = Math.floor(fy);
+    const tx = fx - x0;
+    const ty = fy - y0;
+    const sx = tx * tx * (3 - 2 * tx);
+    const sy = ty * ty * (3 - 2 * ty);
+    const v = (x: number, y: number) => {
+      let h = Math.imul(x * 374761393 + y * 668265263 + this.pocketSeed, 1274126177);
+      h ^= h >>> 15;
+      return ((h >>> 0) % 10000) / 10000;
+    };
+    const top = v(x0, y0) + (v(x0 + 1, y0) - v(x0, y0)) * sx;
+    const bottom = v(x0, y0 + 1) + (v(x0 + 1, y0 + 1) - v(x0, y0 + 1)) * sx;
+    const n = top + (bottom - top) * sy;
+    return 2.6 * n * n + 0.13;
   }
 
   private rand(): number {
@@ -243,7 +267,8 @@ export class DiveWorld {
         }
 
         let oreId: string | null = null;
-        if (this.rand() < stratum.oreDensity) {
+        // Ore clusters into pockets: a smooth field with mean 1 scales the stratum's density
+        if (this.rand() < stratum.oreDensity * this.orePocket(gx, gy)) {
           oreId = this.pickWeightedOre(stratum.oreWeights);
         }
 

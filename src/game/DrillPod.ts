@@ -447,14 +447,14 @@ export class DrillPod {
         const baseVal = Math.round(oreCfg.value * stats.oreValueMultiplier);
         const unitVal = Math.round(baseVal * comboMult);
         this.comboBonusCredits += (unitVal - baseVal) * qty;
-        const comboTag = this.comboCount > 1 ? ` [x${this.comboCount}]` : '';
+        // Short value popups keep a fast dig readable; the ore name and combo live in the pod badge
         particles.addFloatingText(
           bx,
           by - 6,
-          `+${qty} ${oreCfg.name}${isDouble ? ' (2×!)' : ''}${comboTag}`,
+          `+$${(unitVal * qty).toLocaleString()}`,
           oreCfg.highlightColor,
-          isDouble || this.comboCount > 1 ? 1.18 : 1.0,
-          `$${(unitVal * qty).toLocaleString()}`
+          isDouble || this.comboCount > 1 ? 1.15 : 0.95,
+          isDouble ? '2× ORE' : undefined
         );
         sound.playOrePickup(oreCfg.tier, isDouble || this.comboCount > 1);
       } else {

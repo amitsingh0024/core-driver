@@ -2335,3 +2335,19 @@ body.reduced-motion .low-fuel-vignette.critical {
 .extract-circle-btn.urge .extract-radial-bg {
   stroke: rgba(255, 82, 82, 0.6);
 }
+
+/* Short landscape phones: the coach tips carry the controls, so drop the hint bar */
+@media (max-height: 500px) {
+  .controls-hint {
+    display: none;
+  }
+
+  .dive-hud-bottom {
+    justify-content: flex-end;
+  }
+
+  .coach-tip {
+    bottom: 16px;
+    left: 40%;
+  }
+}
