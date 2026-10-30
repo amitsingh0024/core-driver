@@ -7,6 +7,7 @@ import { SettingsForm } from '../screens/SettingsForm';
 import { HangarScreen } from '../screens/hangar/HangarScreen';
 import { SVG_ICONS, CORE_DIVER_LOGO_SVG } from '../ui/svgIcons';
 import { $ } from '../ui/dom';
+import { applyUiLocks } from '../ui/Progression';
 
 type ScreenMode = 'TITLE' | 'DIVE' | 'RESULTS' | 'HANGAR';
 
@@ -122,6 +123,7 @@ export class Game {
 
     $('btn-back-title').addEventListener('click', () => this.transitionTo('TITLE'));
     $('btn-launch-dive').addEventListener('click', () => this.startDive());
+    $('btn-hangar-settings').addEventListener('click', () => this.hangar.switchTab('settings'));
   }
 
   /** Fades to black, swaps screens (running `swap` while hidden), then fades back in. */
@@ -146,6 +148,7 @@ export class Game {
 
   private showScreen(next: ScreenMode): void {
     this.mode = next;
+    applyUiLocks(this.ctx.save);
     this.dive.setPaused(false);
     $('title-screen').classList.toggle('active', next === 'TITLE');
     $('dive-screen').classList.toggle('active', next === 'DIVE');
@@ -173,7 +176,7 @@ export class Game {
         comboBonusCredits: pod.comboBonusCredits,
         relicCredits: pod.relicCredits,
         relicsFound: pod.relicsFound,
-        contract: this.dive.contract,
+        contract: this.dive.contractActive ? this.dive.contract : null,
         contractMetDuringDive: this.dive.contractCompleted,
       },
       planet,

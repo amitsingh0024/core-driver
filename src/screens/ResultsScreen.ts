@@ -2,6 +2,8 @@ import { PLANETS, PlanetConfig } from '../config/planets';
 import { GameContext } from '../core/GameContext';
 import { DivePayout } from '../game/DivePayout';
 import { $ } from '../ui/dom';
+import { isFirstUpgradePending } from '../ui/Progression';
+import { cheapestAvailableCost } from './hangar/upgradeHints';
 
 /** Post-dive sell screen: outcome title, stamps, ore manifest and payout. */
 export class ResultsScreen {
@@ -22,7 +24,7 @@ export class ResultsScreen {
       outcomeTitle.textContent = 'FUEL DEPLETED — EMERGENCY TOW';
       outcomeTitle.dataset.outcome = 'tow';
     } else {
-      outcomeTitle.textContent = 'SAFE WINCH EXTRACTION';
+      outcomeTitle.textContent = 'SAFE RETURN';
       outcomeTitle.dataset.outcome = 'safe';
     }
 
@@ -41,9 +43,11 @@ export class ResultsScreen {
     this.renderStamps(payout);
     this.renderManifest(payout, planet);
 
-    $('results-mult-note').textContent =
-      `Refinery Value Multiplier ×${this.game.stats.oreValueMultiplier.toFixed(2)} • ${payout.oreUnitsKept} Ores Refined`;
+    // Only worth a line once an upgrade has actually raised ore value
+    const mult = this.game.stats.oreValueMultiplier;
+    $('results-mult-note').textContent = mult > 1.001 ? `Ore value ×${mult.toFixed(2)} from upgrades` : '';
     this.countUpTotal(payout.totalEarned);
+    this.renderUpgradeButton();
   }
 
   private countToken = 0;
@@ -72,18 +76,28 @@ export class ResultsScreen {
     requestAnimationFrame(step);
   }
 
+  /** Names what the payout can buy, and pulses it while the player hasn't bought their first upgrade. */
+  private renderUpgradeButton(): void {
+    const save = this.game.save;
+    const affordable = cheapestAvailableCost(save) <= save.cash;
+    $('results-hangar-label').textContent = affordable
+      ? `SPEND $${save.cash.toLocaleString()} ON UPGRADES`
+      : 'UPGRADE RIG';
+    $('btn-results-hangar').classList.toggle('nudge', affordable && isFirstUpgradePending(save));
+  }
+
+  /** One stamp: the most notable thing about this dive (the cutscene already covers a cracked core). */
   private renderStamps(payout: DivePayout): void {
-    const stamps: string[] = [];
-    if (payout.reason === 'core_shattered') stamps.push(`<span class="stamp-badge gold">CORE CRACKED</span>`);
-    if (payout.isNewBestDepth) stamps.push(`<span class="stamp-badge cyan">NEW BEST DEPTH</span>`);
-    if (payout.contractCompleted) stamps.push(`<span class="stamp-badge green">CONTRACT MET</span>`);
+    let stamp = '';
     if (payout.reason === 'fuel_out') {
       const lostPct = Math.round((1 - payout.keepRatio) * 100);
-      stamps.push(`<span class="stamp-badge red">CARGO LOST ${lostPct}%</span>`);
-    } else {
-      stamps.push(`<span class="stamp-badge green">100% RECOVERED</span>`);
+      stamp = `<span class="stamp-badge red">CARGO LOST ${lostPct}%</span>`;
+    } else if (payout.isNewBestDepth && payout.reason !== 'core_shattered') {
+      stamp = `<span class="stamp-badge cyan">NEW BEST DEPTH</span>`;
+    } else if (payout.contractCompleted) {
+      stamp = `<span class="stamp-badge green">CONTRACT MET</span>`;
     }
-    $('results-stamps').innerHTML = stamps.join('');
+    $('results-stamps').innerHTML = stamp;
   }
 
   private renderManifest(payout: DivePayout, planet: PlanetConfig): void {
@@ -95,7 +109,6 @@ export class ResultsScreen {
         <div class="manifest-row">
           <span class="manifest-empty">No ores collected during this dive.</span>
           <span>0</span>
-          <span>—</span>
           <span>$0</span>
         </div>
       `;
@@ -124,12 +137,10 @@ export class ResultsScreen {
 
       const qtySpan = document.createElement('span');
       qtySpan.textContent = `×${row.kept}`;
-      const unitSpan = document.createElement('span');
-      unitSpan.textContent = `$${row.unitVal.toLocaleString()}`;
       const subSpan = document.createElement('span');
       subSpan.textContent = `+$${row.subtotal.toLocaleString()}`;
 
-      div.append(oreCell, qtySpan, unitSpan, subSpan);
+      div.append(oreCell, qtySpan, subSpan);
       listBox.appendChild(div);
     });
 
@@ -140,7 +151,6 @@ export class ResultsScreen {
       row.innerHTML = `
         <div class="manifest-ore-cell">${bonus.label}</div>
         <span>×1</span>
-        <span>$${bonus.amount.toLocaleString()}</span>
         <span>+$${bonus.amount.toLocaleString()}</span>
       `;
       listBox.appendChild(row);

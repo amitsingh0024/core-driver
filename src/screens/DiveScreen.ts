@@ -9,6 +9,7 @@ import { DiveContract, ContractProgress, contractProgress, contractProgressText,
 import { DiveRenderer } from '../render/DiveRenderer';
 import { PortalSDK } from '../sdk/PortalSDK';
 import { $, setStyle, setText } from '../ui/dom';
+import { isUnlocked } from '../ui/Progression';
 
 /** Active dive: world simulation, input, HUD and canvas rendering. */
 export class DiveScreen {
@@ -18,6 +19,8 @@ export class DiveScreen {
   public readonly feel = new GameFeel();
   public contract!: DiveContract;
   public contractCompleted = false;
+  /** Work orders stay off for a new player's first dives so the HUD only teaches the core loop. */
+  public contractActive = false;
   private canvas = $<HTMLCanvasElement>('dive-canvas');
   private lowFuelVignette = $('low-fuel-vignette');
   private coarsePointer = window.matchMedia?.('(pointer: coarse)');
@@ -87,6 +90,7 @@ export class DiveScreen {
     this.game.particles.clear();
     this.feel.clear();
     this.contract = rollContract(planet, this.game.save.deepestByPlanet[planet.id] ?? 0, this.game.stats);
+    this.contractActive = isUnlocked(this.game.save, 'fullHud');
     this.contractCompleted = false;
     $('hud-contract').classList.remove('done');
     $('hud-contract-label').textContent = this.contract.label;
@@ -315,7 +319,7 @@ export class DiveScreen {
       },
       {
         id: 'contract',
-        when: coach.elapsed > 1.2,
+        when: this.contractActive && coach.elapsed > 1.2,
         text: 'Each dive comes with a CONTRACT at the top of the screen. Finish it for a bonus payout.',
       },
       {
@@ -344,7 +348,7 @@ export class DiveScreen {
   }
 
   private checkContract(): void {
-    if (this.contractCompleted) return;
+    if (!this.contractActive || this.contractCompleted) return;
     if (contractProgress(this.contract, this.contractState()) < 1) return;
     // A haul contract only counts once it's safely extracted, so it is settled at the end instead
     if (this.contract.kind === 'haul') return;
@@ -367,6 +371,7 @@ export class DiveScreen {
     cargoMiniFill: $('hud-cargo-mini-fill'),
     cargoPill: $('hud-cargo-pill'),
     haulValue: $('hud-haul-value'),
+    cargoCash: $('hud-cargo-cash'),
     contract: $('hud-contract'),
     contractProgress: $('hud-contract-progress'),
     contractFill: $('hud-contract-fill'),
@@ -415,8 +420,9 @@ export class DiveScreen {
     setStyle(hud.cargoMiniFill, 'width', `${cargoPct.toFixed(1)}%`);
     hud.cargoPill.classList.toggle('cargo-full', this.pod.cargoUsed >= this.pod.maxCargo);
 
-    const haulVal = this.haulValue();
-    setText(hud.haulValue, `$${(haulVal + this.pod.relicCredits).toLocaleString()}`);
+    const haulText = `$${(this.haulValue() + this.pod.relicCredits).toLocaleString()}`;
+    setText(hud.haulValue, haulText);
+    setText(hud.cargoCash, haulText);
 
     const progress = this.contractState();
     setText(hud.contractProgress, contractProgressText(this.contract, progress));

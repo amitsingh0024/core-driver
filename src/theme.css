@@ -96,8 +96,7 @@ body,
 .depth-counter,
 .fuel-numbers,
 .pill-value,
-.cash-value-row,
-.telemetry-val {
+.cash-value-row {
   background: var(--lcd-bg);
   border: 1.5px solid #0b0d0a;
   border-radius: 4px;
@@ -1364,14 +1363,6 @@ input[type='range']:focus-visible {
   margin: 0 -26px 6px;
 }
 
-.title-tagline {
-  font-family: var(--font-label);
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  color: var(--cream-dim);
-}
-
 #btn-title-play {
   font-size: 18px;
   min-height: 56px;
@@ -1472,7 +1463,6 @@ input[type='range']:focus-visible {
 
 .cash-label,
 .stage-pill-label,
-.telemetry-header,
 .panel-section-title,
 .garage-eyebrow,
 .inspector-branch {
@@ -1691,41 +1681,6 @@ input[type='range']:focus-visible {
   background: repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.12) 0 6px, transparent 6px 12px), #3a3d41;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
   text-shadow: none;
-}
-
-.telemetry-card {
-  padding: 14px;
-}
-
-.telemetry-header {
-  margin-bottom: 10px;
-}
-
-.telemetry-grid {
-  gap: 8px;
-}
-
-.telemetry-item {
-  padding: 6px 8px;
-  border: 1.5px solid rgba(0, 0, 0, 0.5);
-  border-radius: 5px;
-  background: rgba(0, 0, 0, 0.22);
-  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.3);
-}
-
-.telemetry-label {
-  margin-bottom: 3px;
-  font-family: var(--font-label);
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: var(--cream-dim);
-}
-
-.telemetry-val {
-  padding: 1px 6px;
-  font-size: 17px;
-  text-align: right;
 }
 
 /* Garage, planet map, codex */
@@ -2042,7 +1997,7 @@ input[type='range']:focus-visible {
 
   .manifest-table-header,
   .manifest-row {
-    grid-template-columns: 1fr 44px 64px 76px;
+    grid-template-columns: 1fr 44px 84px;
   }
 
   .manifest-ore-cell {
