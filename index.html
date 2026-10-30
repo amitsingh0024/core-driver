@@ -153,6 +153,7 @@
               <div class="pill-top-row">
                 <span class="inline-svg" data-svg="cargo"></span>
                 <span class="pill-label">CARGO</span>
+                <canvas id="hud-last-ore-canvas" class="hud-last-ore-canvas" width="20" height="20"></canvas>
               </div>
               <span class="pill-value tabular" id="hud-cargo-text">0 / 18</span>
               <div class="cargo-mini-track">
@@ -161,7 +162,7 @@
               <span class="cargo-cash tabular" id="hud-cargo-cash">$0</span>
             </div>
 
-            <div class="stat-pill haul-pill steel-chip">
+            <div class="stat-pill haul-pill steel-chip" id="hud-haul-pill">
               <div class="pill-top-row">
                 <span class="inline-svg" data-svg="coin"></span>
                 <span class="pill-label">HAUL</span>
@@ -183,7 +184,9 @@
               <span></span><span></span><span></span><span></span>
             </div>
             <div class="depth-marker-best" id="depth-marker-best" title="Best Depth"></div>
-            <div class="depth-marker-pod" id="depth-marker-pod"></div>
+            <div class="depth-marker-pod" id="depth-marker-pod">
+              <span class="depth-pod-readout tabular" id="depth-pod-readout">0m</span>
+            </div>
           </div>
           <div class="depth-core-badge" id="depth-core-icon" data-svg="core"></div>
           <div class="depth-meter-footer tabular" id="hud-core-dist">800m</div>
@@ -199,6 +202,7 @@
           <button id="btn-hold-extract" class="extract-circle-btn" title="Hold to Winch Surface (Space / E)" aria-label="Hold to winch to the surface">
             <svg class="extract-radial-svg" viewBox="0 0 100 100">
               <circle class="extract-radial-bg" cx="50" cy="50" r="44" />
+              <circle class="extract-gear-ring" cx="50" cy="50" r="38" />
               <circle
                 id="extract-radial-circle"
                 class="extract-radial-fg"
@@ -225,6 +229,9 @@
         <div class="results-backdrop">
           <div class="results-card steel-panel">
             <div class="hazard-stripe-bar"></div>
+
+            <!-- Live Animated Pod Landing & Ore-to-Sell-Counter Canvas (Page 12) -->
+            <canvas id="results-scene-canvas" class="results-scene-canvas" width="680" height="116"></canvas>
 
             <!-- Optional Core Shattered Cutscene Banner -->
             <div id="results-core-cutscene" class="results-core-cutscene hidden">
@@ -469,9 +476,24 @@
           <div class="hazard-stripe-bar"></div>
           <div class="modal-header">
             <h2>DIVE PAUSED</h2>
-            <button id="btn-close-pause" class="hud-icon-btn">✕</button>
+            <div class="pause-header-controls">
+              <button id="btn-close-pause" class="hud-icon-btn" title="Close">
+                <span class="btn-icon" data-svg="close"></span>
+              </button>
+            </div>
           </div>
           <div class="modal-content">
+            <!-- Total credits inside the Pause Menu -->
+            <div class="pause-status-strip">
+              <div class="stat-pill haul-pill steel-chip">
+                <div class="pill-top-row">
+                  <span class="inline-svg" data-svg="coin"></span>
+                  <span class="pill-label">TOTAL CREDITS</span>
+                </div>
+                <span class="pill-value tabular" id="pause-total-credits">$0</span>
+              </div>
+            </div>
+
             <div id="pause-settings-form" class="settings-form"></div>
             <div class="pause-modal-actions">
               <button id="btn-pause-resume" class="btn-primary btn-green">
@@ -495,7 +517,9 @@
           <div class="hazard-stripe-bar"></div>
           <div class="modal-header">
             <h2>CORE DIVER — CREDITS</h2>
-            <button id="btn-close-credits" class="hud-icon-btn">✕</button>
+            <button id="btn-close-credits" class="hud-icon-btn" title="Close">
+              <span class="btn-icon" data-svg="close"></span>
+            </button>
           </div>
           <div class="modal-content credits-body">
             <p><strong>Core Diver: Planetary Mining Incremental</strong></p>

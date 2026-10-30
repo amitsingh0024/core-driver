@@ -8,6 +8,7 @@ import {
 } from '../../config/skillTree';
 import { GameContext } from '../../core/GameContext';
 import { SkillTreeView, BRANCH_COLORS } from '../../ui/SkillTreeView';
+import { SVG_ICONS } from '../../ui/svgIcons';
 import { $ } from '../../ui/dom';
 import { SettingsForm } from '../SettingsForm';
 import { GarageTab } from './GarageTab';
@@ -154,7 +155,7 @@ export class HangarScreen {
     for (const reason of ev.lockReasons) {
       const div = document.createElement('div');
       div.className = 'lock-pill';
-      div.textContent = `LOCKED: ${reason}`;
+      div.innerHTML = `${SVG_ICONS.lock} <span>LOCKED: ${reason}</span>`;
       locksBox.appendChild(div);
     }
 

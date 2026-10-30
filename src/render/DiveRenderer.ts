@@ -225,24 +225,59 @@ export class DiveRenderer {
 
     ctx.drawImage(shade, 0, 0, w, h);
 
-    // Warm lamp tint and drifting dust caught in the light
+    // Warm lamp tint and biome-specific underground weather caught in the light
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const tint = ctx.createRadialGradient(px, py, 10, px, py, lampR * 0.8);
-    tint.addColorStop(0, 'rgba(120, 240, 255, 0.10)');
-    tint.addColorStop(1, 'rgba(120, 240, 255, 0)');
+    const planetId = world.planet.id;
+    if (planetId === 2) {
+      tint.addColorStop(0, 'rgba(160, 235, 255, 0.11)');
+      tint.addColorStop(1, 'rgba(160, 235, 255, 0)');
+    } else if (planetId === 3) {
+      tint.addColorStop(0, 'rgba(234, 128, 252, 0.11)');
+      tint.addColorStop(1, 'rgba(234, 128, 252, 0)');
+    } else {
+      tint.addColorStop(0, 'rgba(120, 240, 255, 0.10)');
+      tint.addColorStop(1, 'rgba(120, 240, 255, 0)');
+    }
     ctx.fillStyle = tint;
     ctx.fillRect(px - lampR, py - lampR, lampR * 2, lampR * 2);
 
     if (pod.depthMeters > 8 && !this.game.save.settings.reducedMotion) {
       const t = pod.animTime;
-      for (const d of this.dust) {
-        const x = ((d.x * w - camX * 0.25 + Math.sin(t * 0.4 + d.y * 9) * 12) % w + w) % w;
-        const y = ((d.y * h - camY * 0.25 - t * d.speed) % h + h) % h;
+      for (let i = 0; i < this.dust.length; i++) {
+        const d = this.dust[i];
+        const driftDir = planetId === 2 ? 1 : -1; // Cryo crystals drift down; spores & magma embers drift up
+        const x = ((d.x * w - camX * 0.25 + Math.sin(t * 0.6 + d.y * 11) * 14) % w + w) % w;
+        const y = ((d.y * h - camY * 0.25 + driftDir * t * d.speed) % h + h) % h;
         const dist = Math.hypot(x - px, y - py);
         if (dist > lampR) continue;
-        ctx.fillStyle = `rgba(160, 250, 255, ${0.4 * (1 - dist / lampR)})`;
-        ctx.fillRect(x, y, d.size, d.size);
+        const fade = (1 - dist / lampR) * (0.45 + 0.35 * Math.sin(t * 3.5 + i));
+
+        if (planetId === 2) {
+          // Sparkling ice crystal glint
+          ctx.strokeStyle = `rgba(179, 229, 252, ${fade.toFixed(2)})`;
+          ctx.lineWidth = 1;
+          const r = d.size * 1.45;
+          ctx.beginPath();
+          ctx.moveTo(x - r, y);
+          ctx.lineTo(x + r, y);
+          ctx.moveTo(x, y - r);
+          ctx.lineTo(x, y + r);
+          ctx.stroke();
+        } else if (planetId === 3) {
+          // Rising void/magma ember
+          ctx.fillStyle = i % 2 === 0 ? `rgba(255, 138, 101, ${fade.toFixed(2)})` : `rgba(234, 128, 252, ${fade.toFixed(2)})`;
+          ctx.beginPath();
+          ctx.arc(x, y, d.size * 0.95, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Bioluminescent spore / warm cavern dust
+          ctx.fillStyle = i % 3 === 0 ? `rgba(129, 199, 132, ${fade.toFixed(2)})` : `rgba(255, 236, 200, ${(fade * 0.8).toFixed(2)})`;
+          ctx.beginPath();
+          ctx.arc(x, y, d.size * 0.85, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
     ctx.restore();
@@ -282,7 +317,7 @@ export class DiveRenderer {
     const padScreenX = worldPixelWidth * 0.5 - camX;
     if (groundY > 0) {
       drawSurfaceSky(ctx, planet, w, groundY, camX, pod.animTime);
-      drawSurfaceBase(ctx, planet, padScreenX, groundY, w, pod.animTime);
+      drawSurfaceBase(ctx, planet, padScreenX, groundY, w, pod.animTime, pod.depthMeters <= 8);
     }
 
     // 2. Visible tiles: tunnels show a darkened back wall, rock gets flip variants so the grid stops repeating
@@ -323,20 +358,18 @@ export class DiveRenderer {
         const blockCanvas = this.rockTile(b.type === 'core' ? b.stratumId : texStratum.id);
         if (blockCanvas) this.drawVariant(ctx, blockCanvas, sx, sy, hash, dpr);
 
-        drawRockEdges(ctx, world, gx, gy, sx, sy);
+        drawRockEdges(ctx, world, gx, gy, sx, sy, hash);
 
         if (b.type === 'fuel_cell') {
           drawEmbedded(ctx, this.game.atlas.fuelCellTile, sx, sy, hash, 0.86);
+          drawFuelCellLiveOverlay(ctx, sx, sy, hash, pod.animTime);
         } else if (b.type === 'beacon') {
           drawEmbedded(ctx, this.game.atlas.beaconTile, sx, sy, hash, 0.86);
+          drawBeaconLiveOverlay(ctx, sx, sy, hash, pod.animTime);
         } else if (b.type === 'core') {
           const coreTile = this.game.atlas.coreTiles.get(planet.id);
           if (coreTile) this.game.atlas.drawTile(ctx, coreTile, sx, sy);
-          const pulse = 0.2 + Math.sin(pod.animTime * 6 + gx) * 0.12;
-          ctx.fillStyle = planet.coreGlowColor;
-          ctx.globalAlpha = pulse;
-          ctx.fillRect(sx, sy, T, T);
-          ctx.globalAlpha = 1.0;
+          drawCoreLiveOverlay(ctx, sx, sy, gx, gy, planet.coreGlowColor, pod.animTime);
         } else if (b.type === 'relic') {
           drawRelicCache(ctx, this.game.atlas.relicChestTile, sx, sy, pod.animTime + gx * 0.7);
         } else if (b.oreId) {
@@ -424,17 +457,19 @@ export class DiveRenderer {
     );
     for (const rt of radarTargets) {
       const angle = Math.atan2(rt.wy - pod.y, rt.wx - pod.x);
-      const indX = pod.x - camX + Math.cos(angle) * 52;
-      const indY = pod.y - camY + Math.sin(angle) * 52;
+      const pulseDist = 52 + Math.sin(pod.animTime * 7) * 2.5;
+      const indX = pod.x - camX + Math.cos(angle) * pulseDist;
+      const indY = pod.y - camY + Math.sin(angle) * pulseDist;
 
       ctx.save();
       ctx.translate(indX, indY);
       ctx.rotate(angle);
       ctx.fillStyle = rt.color;
       ctx.beginPath();
-      ctx.moveTo(7, 0);
-      ctx.lineTo(-5, -5);
-      ctx.lineTo(-5, 5);
+      ctx.moveTo(8, 0);
+      ctx.lineTo(-5, -5.5);
+      ctx.lineTo(-2.5, 0);
+      ctx.lineTo(-5, 5.5);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
@@ -447,22 +482,50 @@ export class DiveRenderer {
       const tx = beam.toX - camX;
       const ty = beam.toY - camY;
       ctx.save();
+      // Outer laser glow
       ctx.strokeStyle = beam.color;
-      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(fx, fy);
       ctx.lineTo(tx, ty);
       ctx.stroke();
 
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.2;
+      // Core beam + crackling energy wave
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = beam.color;
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      const midX = (fx + tx) * 0.5 + Math.sin(pod.animTime * 45) * 3.5;
+      const midY = (fy + ty) * 0.5 + Math.cos(pod.animTime * 45) * 3.5;
+      ctx.quadraticCurveTo(midX, midY, tx, ty);
       ctx.stroke();
 
-      // Hit spark at beam end
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+
+      // Muzzle flash at drone & molten impact ring at rock
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(tx, ty, 3.5 + Math.sin(pod.animTime * 40) * 1.2, 0, Math.PI * 2);
+      ctx.arc(fx, fy, 2.8, 0, Math.PI * 2);
       ctx.fill();
+
+      const hitR = 4 + Math.sin(pod.animTime * 42) * 1.6;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(tx, ty, hitR * 0.75, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = beam.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(tx, ty, hitR * 1.4, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -473,20 +536,47 @@ export class DiveRenderer {
       const hoverBob = Math.sin(pod.animTime * 9 + d * 2.1) * 2.5;
       const dx = pod.x - camX + Math.cos(orbitAngle) * 30;
       const dy = pod.y - camY + Math.sin(orbitAngle) * 21 + hoverBob;
+      const activeBeam = pod.droneBeams[d];
+      const tilt = activeBeam
+        ? Math.max(-0.38, Math.min(0.38, (activeBeam.toX - activeBeam.fromX) * 0.006))
+        : Math.cos(orbitAngle) * 0.14;
+
+      ctx.save();
+      ctx.translate(dx, dy);
+      ctx.rotate(tilt);
+
+      // Thruster underglow beneath drone
+      const accentCol = d === 2 ? '#ff4081' : d === 1 ? '#ea80fc' : '#00e5ff';
+      ctx.fillStyle = accentCol;
+      ctx.globalAlpha = 0.35 + Math.sin(pod.animTime * 28 + d) * 0.15;
+      ctx.beginPath();
+      ctx.ellipse(0, 9, 4.5, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
 
       if (droneSprite) {
-        const dSize = 24;
-        ctx.drawImage(droneSprite, dx - dSize / 2, dy - dSize / 2, dSize, dSize);
+        const dSize = 25;
+        ctx.drawImage(droneSprite, -dSize / 2, -dSize / 2, dSize, dSize);
       } else {
-        const droneGrad = ctx.createRadialGradient(dx - 2, dy - 2, 1, dx, dy, 7.5);
+        const droneGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, 7.5);
         droneGrad.addColorStop(0, '#ffffff');
-        droneGrad.addColorStop(0.5, d === 2 ? '#ff4081' : d === 1 ? '#ea80fc' : '#00e5ff');
+        droneGrad.addColorStop(0.5, accentCol);
         droneGrad.addColorStop(1, '#102027');
         ctx.fillStyle = droneGrad;
         ctx.beginPath();
-        ctx.arc(dx, dy, 7.5, 0, Math.PI * 2);
+        ctx.arc(0, 0, 7.5, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // High-speed spinning top rotor blur halo
+      const rotorW = 8 + Math.abs(Math.sin(pod.animTime * 38 + d * 1.7)) * 6;
+      ctx.strokeStyle = 'rgba(224, 247, 250, 0.75)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(-rotorW, -10.5);
+      ctx.lineTo(rotorW, -10.5);
+      ctx.stroke();
+      ctx.restore();
     }
 
     // 6. Draw Winch Tether Cable from surface when Extracting
@@ -518,8 +608,10 @@ export class DiveRenderer {
         isCargoFull,
         isMoving: pod.isMoving,
         isDrilling: pod.isDrilling,
+        isHardGrinding: pod.isHardGrinding,
         extractProgress: pod.extractProgress,
         steeringDir,
+        cargoCatchPulse: this.dive.feel.cargoCatchPulse,
       }),
       1.0
     );
@@ -588,14 +680,14 @@ export class DiveRenderer {
     }
 
     // 10. Draw Particles & Floating Ore Popups
-    this.dive.feel.render(ctx, camX, camY);
+    this.dive.feel.render(ctx, camX, camY, this.game.atlas);
     this.game.particles.render(ctx, camX, camY);
 
     ctx.restore();
   }
 }
 
-/** Renders the Ancient Relic Chest using the HD illustrated sprite + pulsing golden halo (Page 7). */
+/** Renders the Ancient Relic Chest using the HD illustrated sprite + pulsing golden halo & rattle (Page 7). */
 function drawRelicCache(
   ctx: CanvasRenderingContext2D,
   sprite: HTMLCanvasElement | undefined,
@@ -604,32 +696,136 @@ function drawRelicCache(
   t: number
 ): void {
   const glow = 0.35 + Math.sin(t * 4) * 0.2;
-  const cx = x + TILE_SIZE / 2;
+  const rattlePhase = t % 3.2;
+  const rattleX = rattlePhase < 0.28 ? Math.sin(t * 46) * 1.4 : 0;
+  const rattleRot = rattlePhase < 0.28 ? Math.cos(t * 42) * 0.06 : 0;
+  const cx = x + TILE_SIZE / 2 + rattleX;
   const cy = y + TILE_SIZE / 2;
 
   ctx.save();
-  const halo = ctx.createRadialGradient(cx, cy, 4, cx, cy, TILE_SIZE * 0.52);
-  halo.addColorStop(0, `rgba(255, 213, 79, ${(0.45 * glow).toFixed(2)})`);
+  const halo = ctx.createRadialGradient(cx, cy, 4, cx, cy, TILE_SIZE * 0.54);
+  halo.addColorStop(0, `rgba(255, 213, 79, ${(0.5 * glow).toFixed(2)})`);
   halo.addColorStop(1, 'rgba(255, 213, 79, 0)');
   ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.arc(cx, cy, TILE_SIZE * 0.52, 0, Math.PI * 2);
+  ctx.arc(cx, cy, TILE_SIZE * 0.54, 0, Math.PI * 2);
   ctx.fill();
 
+  ctx.translate(cx, cy);
+  ctx.rotate(rattleRot);
   if (sprite) {
     const sz = TILE_SIZE * 0.86;
-    ctx.drawImage(sprite, cx - sz / 2, cy - sz / 2, sz, sz);
+    ctx.drawImage(sprite, -sz / 2, -sz / 2, sz, sz);
   } else {
     const pad = TILE_SIZE * 0.18;
     const w = TILE_SIZE - pad * 2;
     const h = w * 0.78;
-    const top = y + (TILE_SIZE - h) / 2;
     ctx.fillStyle = '#5d3a1a';
-    ctx.fillRect(x + pad, top, w, h);
+    ctx.fillRect(-w / 2, -h / 2, w, h);
     ctx.strokeStyle = '#ffd54f';
     ctx.lineWidth = 2;
-    ctx.strokeRect(x + pad + 1, top + 1, w - 2, h - 2);
+    ctx.strokeRect(-w / 2 + 1, -h / 2 + 1, w - 2, h - 2);
   }
+
+  // Rising golden treasure motes
+  for (let i = 0; i < 3; i++) {
+    const mPhase = (t * 0.85 + i * 0.33) % 1;
+    const mx = (i - 1) * 8 + Math.sin(t * 3 + i) * 2.5;
+    const my = 6 - mPhase * 20;
+    ctx.fillStyle = `rgba(255, 241, 118, ${(1 - mPhase) * 0.85})`;
+    ctx.beginPath();
+    ctx.arc(mx, my, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawFuelCellLiveOverlay(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  hash: number,
+  t: number
+): void {
+  const cx = sx + TILE_SIZE / 2;
+  const cy = sy + TILE_SIZE / 2;
+  ctx.save();
+  // Rising green plasma bubbles inside the cell window
+  for (let i = 0; i < 2; i++) {
+    const bPhase = (t * 1.1 + i * 0.5 + (hash % 7) * 0.1) % 1;
+    const bx = cx + (i === 0 ? -2 : 2);
+    const by = cy + 6 - bPhase * 12;
+    ctx.fillStyle = `rgba(185, 246, 202, ${(1 - bPhase) * 0.85})`;
+    ctx.beginPath();
+    ctx.arc(bx, by, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Pulsing green status LED on top cap
+  const blink = 0.45 + 0.55 * Math.sin(t * 6 + (hash % 11));
+  ctx.fillStyle = `rgba(0, 230, 118, ${blink.toFixed(2)})`;
+  ctx.beginPath();
+  ctx.arc(cx, cy - 11, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBeaconLiveOverlay(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  hash: number,
+  t: number
+): void {
+  const cx = sx + TILE_SIZE / 2;
+  const cy = sy + TILE_SIZE / 2;
+  const sweepAngle = t * 2.8 + (hash % 9);
+  ctx.save();
+  ctx.translate(cx, cy - 2);
+  // Sweeping radar cone
+  ctx.fillStyle = 'rgba(0, 229, 255, 0.22)';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, 16, sweepAngle, sweepAngle + 0.65);
+  ctx.closePath();
+  ctx.fill();
+
+  // Blinking antenna tip LED
+  const blink = Math.sin(t * 8 + (hash % 5)) > 0 ? 1 : 0.25;
+  ctx.fillStyle = `rgba(0, 229, 255, ${blink})`;
+  ctx.beginPath();
+  ctx.arc(0, -10, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCoreLiveOverlay(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  gx: number,
+  gy: number,
+  glowColor: string,
+  t: number
+): void {
+  const T = TILE_SIZE;
+  const pulse = 0.18 + Math.sin(t * 6 + gx + gy) * 0.11;
+  ctx.save();
+  ctx.fillStyle = glowColor;
+  ctx.globalAlpha = pulse;
+  ctx.fillRect(sx, sy, T, T);
+
+  // Crackling energy arc across the core block
+  const cx = sx + T / 2;
+  const cy = sy + T / 2;
+  ctx.globalAlpha = 0.75;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.3;
+  const a = t * 3.5 + gx * 1.7 + gy * 2.3;
+  ctx.beginPath();
+  ctx.moveTo(cx + Math.cos(a) * 11, cy + Math.sin(a) * 11);
+  ctx.lineTo(cx + Math.sin(a * 2.3) * 3, cy + Math.cos(a * 1.9) * 3);
+  ctx.lineTo(cx - Math.cos(a) * 11, cy - Math.sin(a) * 11);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -862,21 +1058,83 @@ function drawTunnelShadow(
   }
 }
 
-/** Dark inner bevel on rock faces that touch a tunnel; the glowing line itself is drawn in the neon pass. */
+/**
+ * Dark jagged inner bevel on rock faces that touch a tunnel, with biome stalactites/icicles hanging
+ * from ceilings; the glowing line itself is drawn in the neon pass.
+ */
 function drawRockEdges(
   ctx: CanvasRenderingContext2D,
   world: DiveWorld,
   gx: number,
   gy: number,
   sx: number,
-  sy: number
+  sy: number,
+  hash: number
 ): void {
   const T = TILE_SIZE;
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-  if (gy > 0 && isOpen(world, gx, gy - 1)) ctx.fillRect(sx, sy + 2, T, 4);
-  if (isOpen(world, gx, gy + 1)) ctx.fillRect(sx, sy + T - 6, T, 4);
-  if (isOpen(world, gx - 1, gy)) ctx.fillRect(sx + 2, sy, 4, T);
-  if (isOpen(world, gx + 1, gy)) ctx.fillRect(sx + T - 6, sy, 4, T);
+  const planetId = world.planet.id;
+
+  if (gy > 0 && isOpen(world, gx, gy - 1)) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + T, sy);
+    ctx.lineTo(sx + T, sy + 3);
+    ctx.lineTo(sx + T * 0.68, sy + 2 + (hash % 3));
+    ctx.lineTo(sx + T * 0.34, sy + 4);
+    ctx.lineTo(sx, sy + 2.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (isOpen(world, gx, gy + 1)) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.fillRect(sx, sy + T - 5, T, 5);
+
+    // Biome-specific hanging ceiling details protruding into the tunnel below
+    const spikeCount = 1 + (hash % 2);
+    for (let i = 0; i < spikeCount; i++) {
+      const px = sx + 8 + ((hash >> (i * 4)) % (T - 16));
+      const hSpike = 4 + ((hash >> (i * 3 + 2)) % 6);
+      if (planetId === 2) {
+        // Translucent cryo icicle
+        ctx.fillStyle = 'rgba(179, 229, 252, 0.68)';
+      } else if (planetId === 3) {
+        // Dark obsidian/slag drip
+        ctx.fillStyle = 'rgba(38, 22, 48, 0.85)';
+      } else {
+        // Cavern stalactite / root
+        ctx.fillStyle = 'rgba(24, 18, 14, 0.78)';
+      }
+      ctx.beginPath();
+      ctx.moveTo(px - 3, sy + T - 1);
+      ctx.lineTo(px + 3, sy + T - 1);
+      ctx.lineTo(px, sy + T + hSpike);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  if (isOpen(world, gx - 1, gy)) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.34)';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + 4, sy);
+    ctx.lineTo(sx + 2 + (hash % 3), sy + T * 0.5);
+    ctx.lineTo(sx + 4, sy + T);
+    ctx.lineTo(sx, sy + T);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (isOpen(world, gx + 1, gy)) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.34)';
+    ctx.beginPath();
+    ctx.moveTo(sx + T, sy);
+    ctx.lineTo(sx + T - 4, sy);
+    ctx.lineTo(sx + T - 2 - ((hash >> 3) % 3), sy + T * 0.5);
+    ctx.lineTo(sx + T - 4, sy + T);
+    ctx.lineTo(sx + T, sy + T);
+    ctx.closePath();
+    ctx.fill();
+  }
 }
 
 /** Draws a pickup or ore smaller than the tile with a little offset, sitting in the rock rather than on it. */

@@ -171,6 +171,15 @@ export class SkillTreeView {
     ctx.fillStyle = sheet;
     ctx.fillRect(0, 0, w, h);
 
+    // Floating background blueprint data motes (drift slower than the scroll for depth)
+    for (let m = 0; m < 18; m++) {
+      const mx = (((m * 197 + this.animTime * 9) % w) + w) % w;
+      const my = (((m * 311 - this.animTime * 11 - this.scrollY * 0.25) % h) + h) % h;
+      const pulse = 0.15 + 0.2 * Math.sin(this.animTime * 2.4 + m);
+      ctx.fillStyle = m % 3 === 0 ? `rgba(0, 229, 255, ${pulse.toFixed(2)})` : `rgba(255, 46, 136, ${(pulse * 0.8).toFixed(2)})`;
+      ctx.fillRect(mx, my, 2, 2);
+    }
+
     const evals = new Map<string, NodeEvaluation>();
     for (const node of SKILL_NODES) {
       evals.set(
@@ -287,6 +296,18 @@ export class SkillTreeView {
     ctx.shadowBlur = 0;
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // Segmented tech reticle marching around the selected card
+    if (selected) {
+      ctx.save();
+      ctx.strokeStyle = col.main;
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([7, 9]);
+      ctx.lineDashOffset = -this.animTime * 22;
+      roundRect(ctx, x - 4, y - 4, w + 8, h + 8, 12);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // Purchase flash
     const boughtAt = this.celebrations.get(node.id);
