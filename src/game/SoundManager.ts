@@ -95,10 +95,10 @@ export class SoundManager {
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(880, t);
-    osc.frequency.exponentialRampToValueAtTime(520, t + 0.05);
-    gain.gain.setValueAtTime(0.06, t);
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1320, t);
+    osc.frequency.exponentialRampToValueAtTime(660, t + 0.04);
+    gain.gain.setValueAtTime(0.035, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
     osc.connect(gain);
     gain.connect(this.master!);
@@ -214,24 +214,28 @@ export class SoundManager {
     osc.stop(ctx.currentTime + (isCore ? 0.26 : 0.08));
   }
 
+  /** Quick rising square-wave arpeggio; rarer ores start higher, doubles add a fourth note. */
   public playOrePickup(tier: number, isDouble = false): void {
     const ctx = this.ensureContext();
     if (!ctx) return;
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    const f1 = 420 + (tier % 5) * 85;
-    osc.frequency.setValueAtTime(f1, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(f1 * (isDouble ? 1.65 : 1.35), ctx.currentTime + 0.12);
-
-    gain.gain.setValueAtTime(0.09, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.13);
-
-    osc.connect(gain);
-    gain.connect(this.master!);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.14);
+    const now = ctx.currentTime;
+    const base = 440 * Math.pow(2, ((tier - 1) % 5) / 6);
+    const notes = isDouble ? [0, 4, 7, 12] : [0, 7, 12];
+    notes.forEach((semi, i) => {
+      const at = now + i * 0.035;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = base * Math.pow(2, semi / 12);
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.045, at + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.09);
+      osc.connect(gain);
+      gain.connect(this.master!);
+      osc.start(at);
+      osc.stop(at + 0.1);
+    });
   }
 
   public playFuelPickup(): void {

@@ -1,3 +1,4 @@
+import { mix, neonStratum, rgba } from '../../assets/neonArt';
 import { PLANETS, PlanetConfig } from '../../config/planets';
 import { GameContext } from '../../core/GameContext';
 import { $ } from '../../ui/dom';
@@ -106,20 +107,36 @@ export class PlanetMapTab {
     ctx.clearRect(0, 0, 64, 64);
     const grad = ctx.createRadialGradient(22, 20, 4, 32, 32, 28);
     if (!unlocked) {
-      grad.addColorStop(0, '#37474f');
-      grad.addColorStop(1, '#101722');
+      grad.addColorStop(0, '#2a1d4a');
+      grad.addColorStop(1, '#07021a');
     } else {
-      grad.addColorStop(0, p.accentColor);
-      grad.addColorStop(0.6, p.strata[2].palette.base);
-      grad.addColorStop(1, p.strata[4].palette.dark);
+      grad.addColorStop(0, mix(p.accentColor, '#ffffff', 0.35));
+      grad.addColorStop(0.55, neonStratum(p.strata[2].id).glow);
+      grad.addColorStop(1, neonStratum(p.strata[4].id).face);
     }
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(32, 32, 27, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = unlocked ? p.accentColor : '#546e7a';
+    // Wireframe latitude bands, then a glowing rim
+    ctx.save();
+    ctx.clip();
+    ctx.strokeStyle = unlocked ? rgba(p.accentColor, 0.35) : 'rgba(185, 103, 255, 0.18)';
+    ctx.lineWidth = 1;
+    for (const ry of [6, 13, 20]) {
+      ctx.beginPath();
+      ctx.ellipse(32, 32, 27, ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.shadowColor = unlocked ? p.accentColor : 'transparent';
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = unlocked ? p.accentColor : '#3a2a6e';
     ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(32, 32, 27, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.shadowBlur = 0;
   }
 }
