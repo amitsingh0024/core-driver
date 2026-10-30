@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Core Diver — Planetary Mining Incremental</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@500;600;700;800&family=Rajdhani:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app" style="--planet-accent: #f5a623">
+      <!-- ====================================================
+           SCREEN 1: TITLE SCREEN
+           ==================================================== -->
+      <section id="title-screen" class="screen active">
+        <canvas id="title-canvas"></canvas>
+        <div class="title-overlay">
+          <div class="title-card steel-panel">
+            <div class="hazard-stripe-bar"></div>
+            <div id="title-logo-slot" class="title-logo-slot"></div>
+            <p class="title-tagline">
+              DEEP-CRUST PLANETARY EXCAVATION • STEER YOUR RIG • SHATTER THE CORE
+            </p>
+            <div class="title-actions">
+              <button id="btn-title-play" class="btn-primary btn-amber">
+                <span class="btn-icon" data-svg="play"></span>
+                <span id="title-play-label">PLAY / CONTINUE</span>
+              </button>
+              <div class="title-sub-actions">
+                <button id="btn-title-hangar" class="btn-secondary">
+                  <span class="btn-icon" data-svg="grid"></span>
+                  <span>OPEN HANGAR HUB</span>
+                </button>
+                <button id="btn-title-settings" class="btn-secondary">
+                  <span class="btn-icon" data-svg="settings"></span>
+                  <span>SETTINGS</span>
+                </button>
+                <button id="btn-title-credits" class="btn-secondary">
+                  <span class="btn-icon" data-svg="info"></span>
+                  <span>CREDITS</span>
+                </button>
+              </div>
+            </div>
+            <div class="title-footer">
+              <span>MANUAL THRUST STEERING • 0 FUEL BURN WHEN IDLE</span>
+              <span>v2.4.0 • DEEP EXCAVATION CORP</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================
+           SCREEN 2: SLIMMED DIVE HUD & GAMEPLAY CANVAS
+           ==================================================== -->
+      <section id="dive-screen" class="screen">
+        <canvas id="dive-canvas"></canvas>
+
+        <!-- Ambient Planet Vignette Overlay (Cryo-Vex frost / Pyra-Void heat) -->
+        <div id="planet-ambient-vignette" class="planet-ambient-vignette"></div>
+
+        <!-- Slide-in Stratum Transition Banner (auto-hides after 2s) -->
+        <div id="stratum-banner" class="stratum-banner">
+          <div class="stratum-banner-inner">
+            <span class="stratum-banner-depth" id="banner-stratum-depth">120m</span>
+            <div class="stratum-banner-text">
+              <div class="stratum-banner-title" id="banner-stratum-title">IRONSTONE CRUST</div>
+              <div class="stratum-banner-sub" id="banner-stratum-sub">ENTERED NEW STRATUM LAYER</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Slimmed HUD Bar -->
+        <header class="dive-hud-top">
+          <!-- Top-Left: Pause Button + Planet/Stratum Chip -->
+          <div class="hud-left">
+            <button id="btn-pause-dive" class="hud-icon-btn" title="Pause Dive (ESC)">
+              <span class="btn-icon" data-svg="pause"></span>
+            </button>
+            <div class="planet-badge steel-chip" id="hud-planet-badge">
+              <span class="planet-dot" id="hud-planet-dot"></span>
+              <div>
+                <div class="planet-title" id="hud-planet-name">TERRA-VEIN</div>
+                <div class="stratum-title tabular" id="hud-stratum-name">Topsoil Loam • 0m</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top-Center: Segmented Fuel Bar -->
+          <div class="fuel-bar-wrapper steel-chip" id="fuel-bar-wrapper">
+            <div class="fuel-bar-header">
+              <span class="fuel-title">
+                <span class="inline-svg" data-svg="fuel"></span>
+                <span>FUEL TANK</span>
+              </span>
+              <span class="fuel-numbers tabular" id="hud-fuel-text">100 / 100 • IDLE (0/s)</span>
+            </div>
+            <div class="fuel-bar-track">
+              <div class="fuel-bar-fill" id="hud-fuel-fill"></div>
+              <div class="fuel-segments-overlay"></div>
+            </div>
+            <div class="fuel-warning-banner hidden" id="hud-fuel-warning">
+              LOW FUEL — HOLD [SPACE] OR EXTRACT BUTTON BEFORE 0%!
+            </div>
+            <div class="hud-contract" id="hud-contract" title="Dive Contract: finish it for a bonus on the Results screen">
+              <span class="contract-tag">CONTRACT</span>
+              <span class="contract-label" id="hud-contract-label">Reach 60m</span>
+              <span class="contract-progress tabular" id="hud-contract-progress">0 / 60m</span>
+              <span class="contract-reward tabular" id="hud-contract-reward">+$0</span>
+              <div class="contract-track"><div class="contract-fill" id="hud-contract-fill"></div></div>
+            </div>
+          </div>
+
+          <!-- Top-Right: Cargo Hold + Haul Value + Sound Toggle -->
+          <div class="hud-right">
+            <div class="stat-pill cargo-pill steel-chip" id="hud-cargo-pill">
+              <div class="pill-top-row">
+                <span class="inline-svg" data-svg="cargo"></span>
+                <span class="pill-label">CARGO</span>
+              </div>
+              <span class="pill-value tabular" id="hud-cargo-text">0 / 18</span>
+              <div class="cargo-mini-track">
+                <div class="cargo-mini-fill" id="hud-cargo-mini-fill"></div>
+              </div>
+            </div>
+
+            <div class="stat-pill haul-pill steel-chip">
+              <div class="pill-top-row">
+                <span class="inline-svg" data-svg="coin"></span>
+                <span class="pill-label">DIVE HAUL</span>
+              </div>
+              <span class="pill-value tabular" id="hud-haul-value">$0</span>
+            </div>
+
+            <button id="btn-mute" class="hud-icon-btn" title="Toggle Audio">
+              <span class="btn-icon" id="mute-icon-slot" data-svg="volumeOn"></span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Right-Edge Vertical Depth Meter -->
+        <aside class="depth-meter-panel steel-chip">
+          <div class="depth-meter-title">DEPTH</div>
+          <div class="depth-meter-track" id="depth-meter-track">
+            <div class="depth-strata-ticks">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <div class="depth-marker-best" id="depth-marker-best" title="Best Depth"></div>
+            <div class="depth-marker-pod" id="depth-marker-pod"></div>
+          </div>
+          <div class="depth-core-badge" id="depth-core-icon" data-svg="core"></div>
+          <div class="depth-meter-footer tabular" id="hud-core-dist">800m</div>
+        </aside>
+
+        <!-- Bottom Controls Hint & Circular 96x96 Hold-to-Extract Button -->
+        <footer class="dive-hud-bottom">
+          <div class="controls-hint steel-chip">
+            <span><strong>STEER &amp; DRILL:</strong> Hold WASD / Arrows or Drag Touch/Mouse</span>
+            <span class="divider">•</span>
+            <span><strong>IDLE = 0 FUEL</strong></span>
+            <span class="divider">•</span>
+            <span><strong>SURFACE:</strong> Hold SPACE / E or Extract Button</span>
+          </div>
+
+          <button id="btn-hold-extract" class="extract-circle-btn" title="Hold to Winch Surface (Space / E)">
+            <svg class="extract-radial-svg" viewBox="0 0 100 100">
+              <circle class="extract-radial-bg" cx="50" cy="50" r="44" />
+              <circle
+                id="extract-radial-circle"
+                class="extract-radial-fg"
+                cx="50"
+                cy="50"
+                r="44"
+                stroke-dasharray="276.46"
+                stroke-dashoffset="276.46"
+              />
+            </svg>
+            <div class="extract-circle-content">
+              <span class="extract-icon" data-svg="extract"></span>
+              <span class="extract-text">EXTRACT</span>
+              <span class="extract-sub">HOLD [SPACE]</span>
+            </div>
+          </button>
+        </footer>
+      </section>
+
+      <!-- ====================================================
+           SCREEN 3: RESULTS & SELL SCREEN (Post-Dive Summary)
+           ==================================================== -->
+      <section id="results-screen" class="screen">
+        <div class="results-backdrop">
+          <div class="results-card steel-panel">
+            <div class="hazard-stripe-bar"></div>
+
+            <!-- Optional Core Shattered Cutscene Banner -->
+            <div id="results-core-cutscene" class="results-core-cutscene hidden">
+              <div class="core-cutscene-icon" data-svg="core"></div>
+              <div>
+                <div class="core-cutscene-title" id="results-core-title">PLANET CORE SHATTERED!</div>
+                <div class="core-cutscene-sub" id="results-core-sub">
+                  Massive seismic bounty awarded &amp; next planetary stage unlocked!
+                </div>
+              </div>
+            </div>
+
+            <!-- Header & Diagonal Stamps -->
+            <div class="results-header">
+              <div>
+                <div class="results-eyebrow" id="results-planet-label">PLANET 1: TERRA-VEIN • DIVE #1</div>
+                <h2 class="results-main-title" id="results-outcome-title">SAFE WINCH EXTRACTION</h2>
+                <div class="results-depth-line tabular" id="results-depth-line">
+                  Max Depth Reached: 240m / 800m
+                </div>
+              </div>
+              <div class="results-stamps" id="results-stamps"></div>
+            </div>
+
+            <!-- Animated Ore Sell Table -->
+            <div class="results-manifest-box">
+              <div class="manifest-table-header">
+                <span>REFINED ORE / BOUNTY</span>
+                <span>QTY</span>
+                <span>UNIT VALUE</span>
+                <span>PAYOUT</span>
+              </div>
+              <div class="manifest-rows" id="results-ore-list"></div>
+            </div>
+
+            <!-- Total Earned Bar -->
+            <div class="results-total-bar">
+              <div class="results-total-left">
+                <span class="results-total-label">TOTAL DIVE PAYOUT</span>
+                <span class="results-mult-note" id="results-mult-note">Refinery Multiplier ×1.00</span>
+              </div>
+              <div class="results-total-amount tabular" id="results-total-payout">+$0</div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="results-actions">
+              <button id="btn-results-hangar" class="btn-primary btn-amber">
+                <span class="btn-icon" data-svg="grid"></span>
+                <span>UPGRADE (DEEP GRID)</span>
+              </button>
+              <button id="btn-results-redive" class="btn-primary btn-green">
+                <span class="btn-icon" data-svg="rocket"></span>
+                <span>DIVE AGAIN</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================
+           SCREEN 4: HANGAR HUB (5 TABS + ALWAYS-VISIBLE TOP BAR)
+           ==================================================== -->
+      <section id="hangar-screen" class="screen">
+        <!-- Always-Visible Top Header Bar -->
+        <header class="hangar-header">
+          <div class="hangar-brand">
+            <button id="btn-back-title" class="brand-badge" title="Return to Title Screen">
+              <span class="inline-svg" data-svg="drill"></span>
+              <span>CORE DIVER</span>
+            </button>
+            <div class="hangar-cash-box steel-chip">
+              <span class="cash-label">CREDITS</span>
+              <div class="cash-value-row">
+                <span class="inline-svg" data-svg="coin"></span>
+                <span class="cash-amount tabular" id="hangar-cash">$0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Stage Quick Pill -->
+          <div class="hangar-stage-indicator steel-chip" id="hangar-planet-pill">
+            <span class="planet-dot" id="hangar-planet-dot"></span>
+            <div>
+              <div class="stage-pill-label">ACTIVE DROP ZONE</div>
+              <div class="stage-pill-name" id="hangar-planet-name">Planet 1: Terra-Vein</div>
+            </div>
+            <button id="btn-quick-switch-planet" class="mini-btn">Change Stage</button>
+          </div>
+
+          <div class="hangar-actions">
+            <button id="btn-launch-dive" class="btn-primary btn-green launch-btn">
+              <span class="btn-icon" data-svg="rocket"></span>
+              <span>LAUNCH DIVE</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Hangar Workspace: 5-Tab Nav Rail + Active Tab Viewport -->
+        <div class="hangar-workspace">
+          <!-- Left Sidebar on Desktop / Bottom Bar on Mobile -->
+          <nav class="hangar-nav-rail" id="hangar-nav-rail">
+            <button class="hangar-nav-btn active" data-tab="grid">
+              <span class="nav-icon" data-svg="grid"></span>
+              <span class="nav-label">Deep Grid</span>
+            </button>
+            <button class="hangar-nav-btn" data-tab="garage">
+              <span class="nav-icon" data-svg="garage"></span>
+              <span class="nav-label">Pod Garage</span>
+            </button>
+            <button class="hangar-nav-btn" data-tab="planets">
+              <span class="nav-icon" data-svg="planet"></span>
+              <span class="nav-label">Planet Map</span>
+            </button>
+            <button class="hangar-nav-btn" data-tab="codex">
+              <span class="nav-icon" data-svg="codex"></span>
+              <span class="nav-label">Ore Codex</span>
+            </button>
+            <button class="hangar-nav-btn" data-tab="settings">
+              <span class="nav-icon" data-svg="settings"></span>
+              <span class="nav-label">Settings</span>
+            </button>
+          </nav>
+
+          <!-- TAB 1: DEEP GRID (Hidden Upgrade Tree + Node Inspector) -->
+          <div class="hangar-tab-pane active" id="tab-pane-grid">
+            <div class="tree-canvas-container">
+              <canvas id="skill-tree-canvas"></canvas>
+
+              <div class="tree-overlay-controls">
+                <div class="tree-legend steel-chip">
+                  <span class="legend-item"><i class="dot owned"></i> Owned</span>
+                  <span class="legend-item"><i class="dot available"></i> Available</span>
+                  <span class="legend-item"><i class="dot locked"></i> Prerequisite / Stage Lock</span>
+                  <span class="legend-item"><i class="dot fog"></i> Fog Frontier</span>
+                </div>
+                <button id="btn-center-tree" class="mini-btn">
+                  <span class="inline-svg" data-svg="compass"></span>
+                  <span>Center Grid</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Right Sidebar: Selected Skill Node Inspector & Pod Stats -->
+            <aside class="hangar-sidebar">
+              <div class="inspector-card steel-panel" id="node-inspector">
+                <div class="hazard-stripe-bar"></div>
+                <div class="inspector-header">
+                  <span class="inspector-branch" id="insp-branch">EXCAVATION</span>
+                  <span class="inspector-planet-tag" id="insp-planet-tag">PLANET 1 TIER</span>
+                </div>
+                <h2 class="inspector-title" id="insp-title">Drill Torque I</h2>
+                <div class="inspector-level-row">
+                  <span class="inspector-level tabular" id="insp-level">Level 0 / 5</span>
+                  <div class="level-pips" id="insp-level-pips"></div>
+                </div>
+                <p class="inspector-desc" id="insp-desc">Increases rotational drill bit torque.</p>
+
+                <div class="inspector-locks" id="insp-locks"></div>
+
+                <button id="btn-buy-node" class="btn-primary btn-amber buy-node-btn tabular">
+                  UPGRADE NODE • $18
+                </button>
+              </div>
+
+              <!-- Live Rig Telemetry Summary -->
+              <div class="telemetry-card steel-panel">
+                <div class="telemetry-header">DRILL RIG TELEMETRY</div>
+                <div class="telemetry-grid tabular" id="telemetry-grid"></div>
+              </div>
+            </aside>
+          </div>
+
+          <!-- TAB 2: POD GARAGE (Interactive 7-Layer Pod Preview + Callout Slots) -->
+          <div class="hangar-tab-pane" id="tab-pane-garage">
+            <div class="garage-layout">
+              <div class="garage-bay-card steel-panel">
+                <div class="hazard-stripe-bar"></div>
+                <div class="garage-bay-header">
+                  <div>
+                    <div class="garage-eyebrow">MARK I–IV MODULAR EXCAVATOR</div>
+                    <h2 id="garage-chassis-title">MK-I PROSPECTOR RIG</h2>
+                  </div>
+                  <span class="garage-hint-pill">Click any component slot to upgrade in Deep Grid</span>
+                </div>
+                <div class="garage-canvas-wrap">
+                  <canvas id="garage-pod-canvas" width="460" height="360"></canvas>
+                </div>
+              </div>
+
+              <div class="garage-slots-panel">
+                <h3 class="panel-section-title">7 SWAPPABLE RIG COMPONENT LAYERS</h3>
+                <div class="garage-slots-grid" id="garage-slots-grid"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: PLANET MAP (3 Worlds in Space Backdrop) -->
+          <div class="hangar-tab-pane" id="tab-pane-planets">
+            <div class="planet-map-container">
+              <div class="planet-map-header">
+                <h2>PLANETARY EXCAVATION SECTORS</h2>
+                <p>Shatter the Planetary Core at the bottom of each world to unlock the next sector and its Stage-Locked Deep Grid tech.</p>
+              </div>
+              <div class="planet-cards-grid" id="planet-cards-grid"></div>
+            </div>
+          </div>
+
+          <!-- TAB 4: ORE CODEX (15 Ores with Undiscovered Silhouettes) -->
+          <div class="hangar-tab-pane" id="tab-pane-codex">
+            <div class="codex-container">
+              <div class="codex-top-bar">
+                <div>
+                  <h2>PLANETARY MINERAL &amp; GEM CODEX</h2>
+                  <p>Undiscovered minerals remain dark silhouettes until excavated during a dive.</p>
+                </div>
+                <div class="codex-discovery-pill steel-chip tabular" id="codex-discovery-count">
+                  Discovered: 0 / 15 Ores
+                </div>
+              </div>
+              <div id="codex-content" class="codex-planets-list"></div>
+            </div>
+          </div>
+
+          <!-- TAB 5: SETTINGS (Audio, Visuals, Accessibility, Save Data) -->
+          <div class="hangar-tab-pane" id="tab-pane-settings">
+            <div class="settings-container">
+              <div class="settings-card steel-panel">
+                <div class="hazard-stripe-bar"></div>
+                <h2>RIG &amp; INTERFACE SETTINGS</h2>
+                <div id="hangar-settings-form" class="settings-form"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================
+           MODAL: PAUSE & QUICK SETTINGS OVERLAY (During Dive)
+           ==================================================== -->
+      <div id="pause-modal" class="modal-backdrop hidden">
+        <div class="modal-card steel-panel pause-modal-card">
+          <div class="hazard-stripe-bar"></div>
+          <div class="modal-header">
+            <h2>DIVE PAUSED</h2>
+            <button id="btn-close-pause" class="hud-icon-btn">✕</button>
+          </div>
+          <div class="modal-content">
+            <div id="pause-settings-form" class="settings-form"></div>
+            <div class="pause-modal-actions">
+              <button id="btn-pause-resume" class="btn-primary btn-green">
+                <span class="btn-icon" data-svg="play"></span>
+                <span>RESUME DIVE</span>
+              </button>
+              <button id="btn-pause-extract" class="btn-primary btn-amber">
+                <span class="btn-icon" data-svg="extract"></span>
+                <span>EXTRACT &amp; RETURN TO HANGAR</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================================================
+           MODAL: CREDITS OVERLAY
+           ==================================================== -->
+      <div id="credits-modal" class="modal-backdrop hidden">
+        <div class="modal-card steel-panel pause-modal-card">
+          <div class="hazard-stripe-bar"></div>
+          <div class="modal-header">
+            <h2>CORE DIVER — CREDITS</h2>
+            <button id="btn-close-credits" class="hud-icon-btn">✕</button>
+          </div>
+          <div class="modal-content credits-body">
+            <p><strong>Core Diver: Planetary Mining Incremental</strong></p>
+            <p>Designed &amp; Engineered with HD 2D Illustrated Sprites, 7-Layer Modular Drill Rigs, 4-Bit Autotiled Strata Caverns, and the Fog-of-War Deep Grid Skill Tree.</p>
+            <p><strong>Worlds:</strong> Terra-Vein (800m) • Cryo-Vex (1150m) • Pyra-Void (1600m)</p>
+            <p><strong>Controls:</strong> WASD / Arrow Keys / Mouse / Touch Drag to steer &amp; drill. Idle consumes 0 Fuel. Hold Space / E or the radial Extract button to surface with 100% cargo.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
