@@ -1,10 +1,13 @@
 import { PLANETS, PlanetConfig } from '../config/planets';
 import { GameContext } from '../core/GameContext';
 import { DivePayout } from '../game/DivePayout';
+import { podLayers } from '../render/podView';
 import { $ } from '../ui/dom';
 
-/** Post-dive sell screen: outcome title, stamps, ore manifest and payout. */
+/** Post-dive sell screen: outcome title, stamps, ore manifest, pod-to-counter animation, and payout. */
 export class ResultsScreen {
+  private countToken = 0;
+
   constructor(private game: GameContext) {}
 
   public show(payout: DivePayout, planet: PlanetConfig): void {
@@ -43,15 +46,14 @@ export class ResultsScreen {
 
     $('results-mult-note').textContent =
       `Refinery Value Multiplier ×${this.game.stats.oreValueMultiplier.toFixed(2)} • ${payout.oreUnitsKept} Ores Refined`;
-    this.countUpTotal(payout.totalEarned);
+    const token = ++this.countToken;
+    this.countUpTotal(payout.totalEarned, token);
+    this.animateLandingAndSellScene(payout, planet, token);
   }
 
-  private countToken = 0;
-
   /** Ticks the payout up from $0 with coin sounds, so the sell moment reads as a reward. */
-  private countUpTotal(total: number): void {
+  private countUpTotal(total: number, token: number): void {
     const el = $('results-total-payout');
-    const token = ++this.countToken;
     const duration = Math.min(1600, 500 + Math.log10(Math.max(10, total)) * 180);
     const start = performance.now() + 250;
     let lastTick = 0;
@@ -70,6 +72,162 @@ export class ResultsScreen {
       else el.classList.remove('counting');
     };
     requestAnimationFrame(step);
+  }
+
+  /**
+   * Page 12: Pod lands on the pad; ore chunks fly from the cargo into a sell counter,
+   * then coins burst into the payout vault.
+   */
+  private animateLandingAndSellScene(payout: DivePayout, planet: PlanetConfig, token: number): void {
+    const canvas = document.getElementById('results-scene-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    const w = canvas.width;
+    const h = canvas.height;
+    const startTime = performance.now();
+
+    // Build flying ore projectiles from collected ores
+    const orePackets: Array<{ oreId: string; color: string; delay: number }> = [];
+    for (const row of payout.rows) {
+      const count = Math.min(6, Math.max(1, row.kept));
+      for (let i = 0; i < count; i++) {
+        orePackets.push({
+          oreId: row.oreId,
+          color: row.color,
+          delay: 0.35 + orePackets.length * 0.07,
+        });
+      }
+    }
+
+    const drawFrame = (now: number) => {
+      if (token !== this.countToken) return;
+      const elapsed = (now - startTime) / 1000;
+
+      ctx.save();
+      ctx.clearRect(0, 0, w, h);
+
+      // 1. Planet Sky & Landing Pad Strip
+      const sky = ctx.createLinearGradient(0, 0, 0, h);
+      sky.addColorStop(0, planet.skyColorTop);
+      sky.addColorStop(1, planet.skyColorBottom);
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, w, h);
+
+      const groundY = h - 20;
+      ctx.fillStyle = '#141c28';
+      ctx.fillRect(0, groundY, w, 20);
+      ctx.fillStyle = planet.accentColor;
+      ctx.fillRect(0, groundY, w, 2);
+
+      // 2. Left: Landing Pad & Descending Drill Pod
+      const padX = 115;
+      ctx.fillStyle = '#263238';
+      ctx.fillRect(padX - 54, groundY - 6, 108, 8);
+      ctx.fillStyle = '#f5a623';
+      for (let hx = padX - 48; hx < padX + 46; hx += 16) {
+        ctx.fillRect(hx, groundY - 4, 8, 4);
+      }
+
+      const landT = Math.min(1, elapsed / 0.45);
+      const easeLand = 1 - Math.pow(1 - landT, 3);
+      const podY = -20 + (groundY - 34 + 20) * easeLand;
+
+      ctx.save();
+      ctx.translate(padX, podY);
+      this.game.atlas.drawLayeredDrillPod(
+        ctx,
+        podLayers(this.game.stats, elapsed, {
+          isMoving: landT < 1,
+          extractProgress: payout.reason === 'extracted' && landT < 1 ? 1 - landT : 0,
+        }),
+        0.78
+      );
+      ctx.restore();
+
+      // 3. Center: Ore Refinery Hopper / Sell Counter
+      const hopperX = 345;
+      const hopperY = groundY - 46;
+      ctx.fillStyle = '#1b2636';
+      ctx.strokeStyle = '#ab47bc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(hopperX - 44, hopperY);
+      ctx.lineTo(hopperX + 44, hopperY);
+      ctx.lineTo(hopperX + 32, groundY);
+      ctx.lineTo(hopperX - 32, groundY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#eceff1';
+      ctx.font = '800 10px "Chakra Petch", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('ORE SELL COUNTER', hopperX, hopperY + 20);
+      ctx.fillStyle = '#69f0ae';
+      ctx.font = '700 11px "Rajdhani", sans-serif';
+      ctx.fillText(`${payout.oreUnitsKept} ORES REFINED`, hopperX, hopperY + 35);
+
+      // 4. Right: Credit Payout Vault
+      const vaultX = 565;
+      const vaultY = groundY - 48;
+      ctx.fillStyle = '#1b2636';
+      ctx.strokeStyle = '#f5a623';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(vaultX - 58, vaultY, 116, 48, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffd54f';
+      ctx.font = '800 10px "Chakra Petch", sans-serif';
+      ctx.fillText('CREDIT VAULT', vaultX, vaultY + 18);
+      ctx.fillStyle = '#69f0ae';
+      ctx.font = '800 13px "Rajdhani", sans-serif';
+      const coinT = Math.max(0, Math.min(1, (elapsed - 0.35) / 1.3));
+      ctx.fillText(`+$${Math.round(payout.totalEarned * coinT).toLocaleString()}`, vaultX, vaultY + 36);
+
+      // 5. Flying Ore Chunks from Pod -> Sell Counter
+      for (const pkt of orePackets) {
+        const pt = (elapsed - pkt.delay) / 0.52;
+        if (pt <= 0 || pt >= 1) continue;
+        const ox = padX + (hopperX - padX) * pt;
+        const oy = (groundY - 38) - Math.sin(pt * Math.PI) * 44;
+        const oreTex = this.game.atlas.oreOverlays.get(pkt.oreId);
+        if (oreTex) {
+          ctx.drawImage(oreTex, ox - 11, oy - 11, 22, 22);
+        } else {
+          ctx.fillStyle = pkt.color;
+          ctx.beginPath();
+          ctx.arc(ox, oy, 7, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // 6. Spinning Coin Bursts from Sell Counter -> Credit Vault
+      const coinCount = payout.totalEarned > 0 ? 10 : 0;
+      for (let c = 0; c < coinCount; c++) {
+        const ct = (elapsed - (0.55 + c * 0.09)) / 0.48;
+        if (ct <= 0 || ct >= 1) continue;
+        const cx = hopperX + (vaultX - hopperX) * ct;
+        const cy = (groundY - 32) - Math.sin(ct * Math.PI) * 36;
+        const spinW = Math.max(2, Math.abs(Math.cos(elapsed * 14 + c)) * 7);
+        ctx.fillStyle = '#ffd54f';
+        ctx.strokeStyle = '#ff8f00';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, spinW, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      if (elapsed < 2.6) {
+        requestAnimationFrame(drawFrame);
+      }
+    };
+
+    requestAnimationFrame(drawFrame);
   }
 
   private renderStamps(payout: DivePayout): void {

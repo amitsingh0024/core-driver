@@ -24,8 +24,8 @@ export class PlanetMapTab {
       card.style.setProperty('--planet-accent', p.accentColor);
 
       const orbCanvas = document.createElement('canvas');
-      orbCanvas.width = 64;
-      orbCanvas.height = 64;
+      orbCanvas.width = 128;
+      orbCanvas.height = 128;
       orbCanvas.className = 'planet-orb-preview';
       this.drawPlanetOrb(orbCanvas.getContext('2d')!, p, unlocked);
 
@@ -103,8 +103,32 @@ export class PlanetMapTab {
   }
 
   private drawPlanetOrb(ctx: CanvasRenderingContext2D, p: PlanetConfig, unlocked: boolean): void {
-    ctx.clearRect(0, 0, 64, 64);
-    const grad = ctx.createRadialGradient(22, 20, 4, 32, 32, 28);
+    const sz = 128;
+    ctx.clearRect(0, 0, sz, sz);
+
+    // Subtle atmosphere halo behind globe
+    if (unlocked) {
+      const halo = ctx.createRadialGradient(sz / 2, sz / 2, 24, sz / 2, sz / 2, 62);
+      halo.addColorStop(0, `${p.accentColor}44`);
+      halo.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(sz / 2, sz / 2, 62, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const planetSprite = this.game.atlas.planetSprites.get(p.id);
+    if (planetSprite) {
+      ctx.save();
+      if (!unlocked) {
+        ctx.filter = 'grayscale(1) brightness(0.42)';
+      }
+      ctx.drawImage(planetSprite, 6, 6, sz - 12, sz - 12);
+      ctx.restore();
+      return;
+    }
+
+    const grad = ctx.createRadialGradient(44, 40, 8, 64, 64, 54);
     if (!unlocked) {
       grad.addColorStop(0, '#37474f');
       grad.addColorStop(1, '#101722');
@@ -115,11 +139,11 @@ export class PlanetMapTab {
     }
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(32, 32, 27, 0, Math.PI * 2);
+    ctx.arc(64, 64, 52, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = unlocked ? p.accentColor : '#546e7a';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.stroke();
   }
 }

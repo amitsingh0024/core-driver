@@ -26,6 +26,10 @@ export interface PodLayerState {
   isMoving: boolean;
   isDrilling: boolean;
   extractProgress: number;
+  steeringDir?: number;          // -1 left, 0 straight, +1 right (for outer-side steering puff)
+  isHardGrinding?: boolean;      // Molten friction heat glow on drill tip
+  cargoCatchPulse?: number;      // 0..1 bounce when ore lands in cargo hopper
+  highlightedLayer?: number | null; // 1..7 when hovering a component card in Pod Garage
 }
 
 export class SpriteAtlas {
@@ -34,6 +38,8 @@ export class SpriteAtlas {
   public oreOverlays: Map<string, HTMLCanvasElement> = new Map();
   public coreTiles: Map<number, HTMLCanvasElement> = new Map();
   public podSprites: Map<number, HTMLCanvasElement> = new Map();
+  public planetSprites: Map<number, HTMLCanvasElement> = new Map();
+  public droneSprites: Map<number, HTMLCanvasElement> = new Map();
   public fuelCellTile!: HTMLCanvasElement;
   public beaconTile!: HTMLCanvasElement;
   public relicChestTile!: HTMLCanvasElement;
@@ -75,10 +81,12 @@ export class SpriteAtlas {
    */
   private async loadTransparentPNGSheets(): Promise<void> {
     try {
-      const [podsImg, oresImg, rocksImg] = await Promise.all([
+      const [podsImg, oresImg, rocksImg, pickupsImg, skillsImg] = await Promise.all([
         this.loadImage('sprites/drill_pods_hd.png'),
         this.loadImage('sprites/ores_gems_hd.png'),
         this.loadImage('sprites/strata_rocks_hd.png'),
+        this.loadImage('sprites/pickups_planets_drones_hd.png').catch(() => null),
+        this.loadImage('sprites/skill_icons_hd.png').catch(() => null),
       ]);
 
       // 1. Slice 3 Drill Pods (192x256 master size each in 576x256 sheet)
@@ -146,6 +154,70 @@ export class SpriteAtlas {
           if (sIdx === 4) {
             this.coreTiles.set(planet.id, c);
           }
+        }
+      }
+
+      // 4. Slice Pickups, Planets & Drones (3x3 grid in 576x576 sheet, 192x192 per cell)
+      if (pickupsImg) {
+        const pCellW = Math.floor(pickupsImg.width / 3);
+        const pCellH = Math.floor(pickupsImg.height / 3);
+
+        // Row 0: 3 Planet Globes (Terra-Vein, Cryo-Vex, Pyra-Void)
+        for (let i = 0; i < 3; i++) {
+          const [c, ctx] = this.createHDCanvas(192, 192);
+          ctx.drawImage(pickupsImg, i * pCellW, 0, pCellW, pCellH, 0, 0, 192, 192);
+          this.planetSprites.set(i + 1, c);
+        }
+
+        // Row 1: Col 0 = Relic Chest, Col 1 = Extraction Beacon Pylon, Col 2 = Fuel Cell Canister
+        const [relicC, relicCtx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
+        relicCtx.drawImage(pickupsImg, 0, pCellH, pCellW, pCellH, 0, 0, HD_SIZE, HD_SIZE);
+        this.relicChestTile = relicC;
+
+        const [beaconC, beaconCtx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
+        beaconCtx.drawImage(pickupsImg, pCellW, pCellH, pCellW, pCellH, 0, 0, HD_SIZE, HD_SIZE);
+        this.beaconTile = beaconC;
+
+        const [fuelC, fuelCtx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
+        fuelCtx.drawImage(pickupsImg, pCellW * 2, pCellH, pCellW, pCellH, 0, 0, HD_SIZE, HD_SIZE);
+        this.fuelCellTile = fuelC;
+
+        // Row 2: 3 Orbiting Mining Drones (Tier 1 Pioneer, Tier 2 Cryo, Tier 3 Void)
+        for (let i = 0; i < 3; i++) {
+          const [c, ctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
+          ctx.drawImage(pickupsImg, i * pCellW, pCellH * 2, pCellW, pCellH, 0, 0, HD_SIZE, HD_SIZE);
+          this.droneSprites.set(i + 1, c);
+        }
+      }
+
+      // 5. Slice 16 Skill Icons (4x4 grid in 512x512 sheet, 128x128 per icon)
+      if (skillsImg) {
+        const iconOrder: SkillIconType[] = [
+          'pod',
+          'drill_dps',
+          'drill_width',
+          'hardness_pen',
+          'core_damage',
+          'fuel_cap',
+          'fuel_eff',
+          'fuel_cell',
+          'hazard_shield',
+          'cargo_cap',
+          'ore_value',
+          'double_ore',
+          'thruster',
+          'winch',
+          'scanner',
+          'drone',
+        ];
+        const sCellW = Math.floor(skillsImg.width / 4);
+        const sCellH = Math.floor(skillsImg.height / 4);
+        for (let idx = 0; idx < iconOrder.length; idx++) {
+          const col = idx % 4;
+          const row = Math.floor(idx / 4);
+          const [c, ctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
+          ctx.drawImage(skillsImg, col * sCellW, row * sCellH, sCellW, sCellH, 0, 0, HD_SIZE, HD_SIZE);
+          this.skillIcons.set(iconOrder[idx], c);
         }
       }
     } catch (err) {
@@ -570,70 +642,148 @@ export class SpriteAtlas {
     ctx.save();
     ctx.scale(scale, scale);
 
-    // Idle hover bob (2 to 3 px bob at 12 fps when not moving)
+    // Idle hover bob + Drilling high-frequency vibration + Squash & Stretch
     const hoverBob = !state.isMoving && !state.isDrilling ? Math.sin(state.animTime * 5) * 2.5 : 0;
-    const vibX = state.isDrilling ? Math.sin(state.animTime * 90) * 1.4 : 0;
-    const vibY = (state.isDrilling ? Math.cos(state.animTime * 75) * 1.2 : 0) + hoverBob;
+    const vibX = state.isDrilling ? Math.sin(state.animTime * 95) * (state.isHardGrinding ? 2.1 : 1.4) : 0;
+    const vibY = (state.isDrilling ? Math.cos(state.animTime * 80) * 1.2 : 0) + hoverBob;
     ctx.translate(vibX, vibY);
 
-    // 1. Volumetric Forward Headlight Cone
-    const lightGrad = ctx.createRadialGradient(0, 18, 6, 0, 75, 98);
-    lightGrad.addColorStop(0, 'rgba(255, 248, 200, 0.24)');
-    lightGrad.addColorStop(0.55, 'rgba(0, 229, 255, 0.08)');
+    // Subtle squash & stretch when thrusting vs drilling impact
+    const stretchY = state.isDrilling
+      ? -0.03 + Math.sin(state.animTime * 45) * 0.018
+      : state.isMoving
+      ? 0.025
+      : Math.sin(state.animTime * 5) * 0.008;
+    ctx.scale(1 - stretchY * 0.65, 1 + stretchY);
+
+    // 1. Volumetric Forward Headlight Cone + Twin Beam Core
+    const lightGrad = ctx.createRadialGradient(0, 18, 6, 0, 78, 104);
+    lightGrad.addColorStop(0, state.isDrilling ? 'rgba(255, 252, 220, 0.34)' : 'rgba(255, 248, 200, 0.24)');
+    lightGrad.addColorStop(0.55, 'rgba(0, 229, 255, 0.09)');
     lightGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = lightGrad;
     ctx.beginPath();
     ctx.moveTo(-16, 12);
     ctx.lineTo(16, 12);
-    ctx.lineTo(68, 130);
-    ctx.lineTo(-68, 130);
+    ctx.lineTo(72, 134);
+    ctx.lineTo(-72, 134);
     ctx.closePath();
     ctx.fill();
 
-    // 2. Layer 1: Thruster Flames (orange, cyan, magenta)
+    // 2. Layer 1: Multi-Stage Thruster Plume, Shock Diamonds & Steering Side Jets
+    const flameColor =
+      state.podTier === 3 ? '#ff4081' : state.podTier === 2 ? '#00e5ff' : '#ff9100';
     if (state.isMoving || state.isDrilling) {
-      const flameLen = 16 + Math.sin(state.animTime * 52) * 5 + (state.isDrilling ? 7 : 0);
-      const flameColor =
-        state.podTier === 3 ? '#ff4081' : state.podTier === 2 ? '#00e5ff' : '#ff9100';
-      const flameGrad = ctx.createLinearGradient(0, -30, 0, -30 - flameLen);
+      const flameLen = 19 + Math.sin(state.animTime * 58) * 6 + (state.isDrilling ? 9 : 0);
+      const flameGrad = ctx.createLinearGradient(0, -28, 0, -30 - flameLen * 1.3);
       flameGrad.addColorStop(0, '#ffffff');
-      flameGrad.addColorStop(0.4, flameColor);
+      flameGrad.addColorStop(0.35, flameColor);
+      flameGrad.addColorStop(0.75, state.podTier === 3 ? 'rgba(213, 0, 249, 0.45)' : 'rgba(255, 87, 34, 0.45)');
       flameGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
+      // Outer plasma plume
       ctx.fillStyle = flameGrad;
       ctx.beginPath();
-      ctx.moveTo(-11, -28);
-      ctx.quadraticCurveTo(0, -30 - flameLen * 1.25, 11, -28);
+      ctx.moveTo(-12, -28);
+      ctx.quadraticCurveTo(0, -32 - flameLen * 1.35, 12, -28);
       ctx.closePath();
       ctx.fill();
+
+      // White-hot inner supersonic core
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.beginPath();
+      ctx.moveTo(-5.5, -28);
+      ctx.quadraticCurveTo(0, -30 - flameLen * 0.68, 5.5, -28);
+      ctx.closePath();
+      ctx.fill();
+
+      // Animated shock-diamond rings pulsing down the exhaust jet
+      for (let d = 0; d < 2; d++) {
+        const phase = (state.animTime * 9 + d * 0.5) % 1;
+        const dy = -31 - phase * flameLen * 0.95;
+        const dw = (1 - phase) * 7.5;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(1 - phase) * 0.75})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(0, dy, dw, 2.2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Side vector thruster jet + puff on the outer side of a turn
+      if (state.steeringDir && Math.abs(state.steeringDir) > 0.08) {
+        const outerSide = state.steeringDir > 0 ? -1 : 1;
+        const jetLen = 11 + Math.sin(state.animTime * 48) * 3;
+        ctx.strokeStyle = '#84ffff';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(outerSide * 19, -15);
+        ctx.lineTo(outerSide * (19 + jetLen), -19);
+        ctx.stroke();
+
+        const puffX = outerSide * (24 + Math.sin(state.animTime * 40) * 3);
+        const puffR = 4.2 + Math.sin(state.animTime * 35) * 1.4;
+        ctx.fillStyle = 'rgba(224, 247, 250, 0.72)';
+        ctx.beginPath();
+        ctx.arc(puffX, -17, puffR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      // Idle pilot-flame glow inside rear thruster nozzle
+      const idlePulse = 0.45 + Math.sin(state.animTime * 10) * 0.2;
+      ctx.fillStyle = flameColor;
+      ctx.globalAlpha = idlePulse;
+      ctx.beginPath();
+      ctx.arc(0, -29, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // Low fuel (< 25%) thruster red sputter puffs
+    if (state.isLowFuel) {
+      for (let s = 0; s < 2; s++) {
+        const sputterPhase = (state.animTime * 5.5 + s * 0.5) % 1;
+        const sputterX = Math.sin(state.animTime * 19 + s * 3) * 9;
+        const sputterY = -32 - sputterPhase * 22;
+        const sputterAlpha = (1 - sputterPhase) * 0.78;
+        ctx.fillStyle = s === 0
+          ? `rgba(255, 82, 82, ${sputterAlpha.toFixed(2)})`
+          : `rgba(38, 50, 56, ${(sputterAlpha * 0.7).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(sputterX, sputterY, 3.2 + sputterPhase * 4.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     const widthScale = 1 + Math.min(0.42, Math.max(0, (state.drillRadiusPx - 21) / 95));
     const drawW = 66 * widthScale;
     const drawH = 86;
 
-    // 3. Layer 2: External Cargo Pods (driven by Cargo branch, bulge when cargo is full!)
+    // 3. Layer 2: External Cargo Pods (bulge when full + elastic bounce on ore catch!)
     if (state.cargoPodLevel > 0) {
-      const bulge = state.isCargoFull ? 3.5 + Math.sin(state.animTime * 12) * 1.2 : 0;
-      const podW = (7 + state.cargoPodLevel * 2.2) + bulge;
-      const podH = 22 + state.cargoPodLevel * 3 + bulge;
+      const catchBounce = (state.cargoCatchPulse ?? 0) * 4.5;
+      const bulge = (state.isCargoFull ? 3.5 + Math.sin(state.animTime * 12) * 1.2 : 0) + catchBounce;
+      const podW = 7 + state.cargoPodLevel * 2.2 + bulge;
+      const podH = 22 + state.cargoPodLevel * 3 + bulge * 0.7;
       const sideX = drawW * 0.44;
 
       const sides = state.cargoPodLevel === 1 ? [-1] : [-1, 1];
       for (const dir of sides) {
+        const rx = dir > 0 ? sideX - 2 : -sideX - podW + 2;
+        const ry = -18 - catchBounce * 0.4;
         ctx.fillStyle = state.isCargoFull ? '#ff9100' : '#ab47bc';
         ctx.strokeStyle = '#140c1c';
         ctx.lineWidth = 2.5;
-        this.drawRoundedRect(
-          ctx,
-          dir > 0 ? sideX - 2 : -sideX - podW + 2,
-          -18,
-          podW,
-          podH,
-          4
-        );
+        this.drawRoundedRect(ctx, rx, ry, podW, podH, 4);
         ctx.fill();
         ctx.stroke();
+
+        // Glowing cargo window strip on each saddlebag
+        ctx.fillStyle = state.isCargoFull
+          ? '#ffd54f'
+          : (state.cargoCatchPulse ?? 0) > 0.1
+          ? '#ffffff'
+          : '#e1bee7';
+        ctx.fillRect(rx + podW * 0.28, ry + 4, podW * 0.44, podH - 8);
       }
     }
 
@@ -644,15 +794,113 @@ export class SpriteAtlas {
       ctx.drawImage(podCanvas, -drawW * 0.5, -drawH * 0.46, drawW, drawH);
     }
 
+    // 4b. Live Spinning Helical Drill Bit & Friction Heat Overlay (Nose Cone y = +10 .. +41)
+    {
+      const spinRate = state.isDrilling ? 28 : state.isMoving ? 14 : 2.5;
+      const spinPhase = (state.animTime * spinRate) % 1;
+      const recoilY = state.isDrilling ? -1.8 + Math.sin(state.animTime * 65) * 1.2 : 0;
+      const coneTopY = 11 + recoilY;
+      const coneTipY = 41 + recoilY;
+      const coneHalfW = drawW * 0.27;
+
+      ctx.save();
+      // Clip helical auger flutes to the conical drill bit silhouette
+      ctx.beginPath();
+      ctx.moveTo(-coneHalfW, coneTopY);
+      ctx.lineTo(coneHalfW, coneTopY);
+      ctx.lineTo(0, coneTipY);
+      ctx.closePath();
+      ctx.clip();
+
+      // Rotating diagonal spiral flutes scrolling down the cone
+      const fluteColor =
+        state.isHardGrinding
+          ? 'rgba(255, 171, 0, 0.72)'
+          : state.podTier === 3
+          ? 'rgba(255, 128, 171, 0.62)'
+          : state.podTier === 2
+          ? 'rgba(132, 255, 255, 0.62)'
+          : 'rgba(255, 248, 225, 0.58)';
+
+      ctx.strokeStyle = fluteColor;
+      ctx.lineWidth = state.isDrilling ? 3.2 : 2.2;
+      for (let i = -2; i <= 4; i++) {
+        const fy = coneTopY + ((i + spinPhase) * 8.5);
+        ctx.beginPath();
+        ctx.moveTo(-coneHalfW - 4, fy - 5);
+        ctx.lineTo(coneHalfW + 4, fy + 5);
+        ctx.stroke();
+
+        // Dark groove shadow alongside each flute
+        ctx.strokeStyle = 'rgba(7, 10, 18, 0.55)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(-coneHalfW - 4, fy - 2);
+        ctx.lineTo(coneHalfW + 4, fy + 8);
+        ctx.stroke();
+        ctx.strokeStyle = fluteColor;
+        ctx.lineWidth = state.isDrilling ? 3.2 : 2.2;
+      }
+
+      // High-speed vertical specular flash when actively drilling
+      if (state.isDrilling || state.isMoving) {
+        const glintX = Math.sin(state.animTime * 36) * (coneHalfW * 0.45);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(glintX, coneTopY);
+        ctx.lineTo(0, coneTipY);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Side rotary cutter teeth moving up/down along cone edges when drilling
+      if (state.drillVisualTier >= 1 || state.isDrilling) {
+        const teethCount = 3;
+        ctx.fillStyle = state.isHardGrinding ? '#ffd54f' : '#eceff1';
+        for (let t = 0; t < teethCount; t++) {
+          const prog = (t / teethCount + spinPhase / teethCount) % 1;
+          const ty = coneTopY + prog * (coneTipY - coneTopY - 4);
+          const halfSpan = coneHalfW * (1 - prog);
+          for (const dir of [-1, 1]) {
+            ctx.beginPath();
+            ctx.arc(dir * (halfSpan + 1.2), ty, 1.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      // Molten Friction Heat Glow at Drill Tip when drilling / hard-grinding
+      if (state.isDrilling) {
+        const heatR = state.isHardGrinding ? 16 : 10;
+        const heatGrad = ctx.createRadialGradient(0, coneTipY - 2, 1, 0, coneTipY - 2, heatR);
+        heatGrad.addColorStop(0, '#ffffff');
+        heatGrad.addColorStop(0.45, state.isHardGrinding ? '#ff6d00' : '#ffd54f');
+        heatGrad.addColorStop(1, 'rgba(255, 87, 34, 0)');
+        ctx.fillStyle = heatGrad;
+        ctx.beginPath();
+        ctx.arc(0, coneTipY - 2, heatR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
     // 5. Layer 4: Hull Plating (bolted armor plates driven by Fuel & Thermal branch)
     if (state.hullPlatingLevel > 0) {
       ctx.fillStyle = state.hullPlatingLevel >= 2 ? '#00e5ff' : '#cfd8dc';
       ctx.strokeStyle = '#101820';
       ctx.lineWidth = 2;
       for (const dir of [-1, 1]) {
-        this.drawRoundedRect(ctx, dir * 18 - 4, -22, 8, 16, 2);
+        const px = dir * 18 - 4;
+        this.drawRoundedRect(ctx, px, -22, 8, 16, 2);
         ctx.fill();
         ctx.stroke();
+        // Rivet dots on armor plate
+        ctx.fillStyle = '#263238';
+        ctx.beginPath();
+        ctx.arc(px + 4, -19, 1.1, 0, Math.PI * 2);
+        ctx.arc(px + 4, -9, 1.1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = state.hullPlatingLevel >= 2 ? '#00e5ff' : '#cfd8dc';
       }
     }
 
@@ -673,29 +921,98 @@ export class SpriteAtlas {
       ctx.stroke();
       ctx.fillStyle = '#84ffff';
       ctx.beginPath();
-      ctx.arc(0, -6, 2.2, 0, Math.PI * 2);
+      ctx.arc(0, -6, 2.4, 0, Math.PI * 2);
       ctx.fill();
+
+      // Expanding radar wave arc from dish tip
+      const wavePhase = (state.animTime * 1.8) % 1;
+      ctx.strokeStyle = `rgba(0, 229, 255, ${(1 - wavePhase) * 0.65})`;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, -6, 4 + wavePhase * 12, -Math.PI * 0.8, -Math.PI * 0.2);
+      ctx.stroke();
       ctx.restore();
     }
 
-    // 7. Layer 6: Cockpit Light State (blinks red when Low Fuel < 25%!)
-    if (state.isLowFuel) {
-      const blink = Math.sin(state.animTime * 16) > 0;
-      if (blink) {
-        ctx.fillStyle = 'rgba(255, 23, 68, 0.72)';
-        ctx.beginPath();
-        ctx.arc(0, -10, 9, 0, Math.PI * 2);
-        ctx.fill();
+    // 7. Layer 6 & 7: Animated Cockpit Pilot Visor, Specular Glass Glint & Low-Fuel Strobe
+    {
+      const lookX = (state.steeringDir ?? 0) * 2.2;
+      const isBlinking = (state.animTime % 3.8) > 3.66;
+      const visorY = -10;
+
+      // Pilot visor eyes inside cockpit dome
+      if (!isBlinking) {
+        ctx.fillStyle = state.isLowFuel ? '#ff8a80' : '#e0f7fa';
+        ctx.fillRect(lookX - 4.2, visorY - 1.2, 3, 2.2);
+        ctx.fillRect(lookX + 1.2, visorY - 1.2, 3, 2.2);
+      }
+
+      // Dynamic curved glass glint that shifts with steering/idle bob
+      const glintShift = Math.sin(state.animTime * 2.5) * 1.5 - lookX * 0.6;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(glintShift, -10, 6.5, -Math.PI * 0.78, -Math.PI * 0.32);
+      ctx.stroke();
+
+      // Red warning strobe when Low Fuel (< 25%)
+      if (state.isLowFuel) {
+        const blink = Math.sin(state.animTime * 16) > 0;
+        if (blink) {
+          ctx.fillStyle = 'rgba(255, 23, 68, 0.68)';
+          ctx.beginPath();
+          ctx.arc(0, -10, 9.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
 
-    // 8. Winch Extraction Ring
+    // 8. Interactive Garage Layer Highlight Bracket (when hovering a slot card in Pod Garage)
+    if (state.highlightedLayer) {
+      const bounds: Record<number, { x: number; y: number; w: number; h: number; color: string }> = {
+        1: { x: -20, y: -48, w: 40, h: 24, color: '#29b6f6' }, // Thrusters
+        2: { x: -24, y: 8, w: 48, h: 36, color: '#ff7043' },   // Rotary Drill
+        3: { x: -24, y: -28, w: 48, h: 38, color: '#f5a623' }, // Core Chassis
+        4: { x: -26, y: -25, w: 52, h: 22, color: '#00e676' }, // Hull Armor
+        5: { x: -38, y: -22, w: 76, h: 30, color: '#ab47bc' }, // Cargo Hoppers
+        6: { x: -18, y: -52, w: 36, h: 20, color: '#00e5ff' }, // Scanner & Drones
+        7: { x: -13, y: -22, w: 26, h: 22, color: '#00e676' }, // Cockpit Canopy
+      };
+      const b = bounds[state.highlightedLayer];
+      if (b) {
+        const pad = 2 + Math.sin(state.animTime * 10) * 1.5;
+        ctx.save();
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        this.drawRoundedRect(ctx, b.x - pad, b.y - pad, b.w + pad * 2, b.h + pad * 2, 5);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // 9. Winch Extraction Grapple Hook & Ring (Page 5: Grapple hook clamps to top)
     if (state.extractProgress > 0) {
+      ctx.save();
       ctx.strokeStyle = '#00e5ff';
+      ctx.fillStyle = '#102436';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-12, -32);
+      ctx.lineTo(-7, -42);
+      ctx.lineTo(7, -42);
+      ctx.lineTo(12, -32);
+      ctx.stroke();
+      this.drawRoundedRect(ctx, -6, -46, 12, 8, 3);
+      ctx.fill();
+      ctx.stroke();
+
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.arc(0, 0, 38, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * state.extractProgress);
       ctx.stroke();
+      ctx.restore();
     }
 
     ctx.restore();

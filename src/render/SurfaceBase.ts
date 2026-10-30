@@ -110,6 +110,28 @@ export function drawSurfaceSky(
     drawCloud(ctx, x, y, 0.7 + ((i * 53) % 40) / 60);
   }
 
+  // Distant sky birds (Planet 1) or high-altitude courier drones (Planets 2 & 3)
+  for (let b = 0; b < 4; b++) {
+    const span = w + 300;
+    const bx = ((b * 280 + time * (22 + b * 4) - camX * 0.12) % span + span) % span - 150;
+    const by = groundY - 250 - (b % 3) * 38 + Math.sin(time * 2.2 + b) * 6;
+    if (planet.id === 1) {
+      const flap = Math.sin(time * 9 + b * 1.7) * 3.5;
+      ctx.strokeStyle = 'rgba(25, 35, 45, 0.55)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(bx - 6, by - flap);
+      ctx.quadraticCurveTo(bx - 2, by - 2, bx, by);
+      ctx.quadraticCurveTo(bx + 2, by - 2, bx + 6, by - flap);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = planet.id === 2 ? '#b3e5fc' : '#ff80ab';
+      ctx.fillRect(bx - 4, by - 1.5, 8, 3);
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.45)';
+      ctx.fillRect(bx - 10, by - 0.8, 6, 1.6);
+    }
+  }
+
   // Far hills
   drawHills(ctx, w, groundY, camX * 0.15, theme.hillFar, 70, 0.0042, 11);
   // Near hills
@@ -180,7 +202,8 @@ export function drawSurfaceBase(
   padX: number,
   groundY: number,
   w: number,
-  time: number
+  time: number,
+  podAtSurface = false
 ): void {
   const theme = surfaceTheme(planet.id);
   const accent = planet.accentColor;
@@ -206,7 +229,7 @@ export function drawSurfaceBase(
   if (visible(padX - 580, 120)) drawOffice(ctx, padX - 580, groundY, accent, time);
   if (visible(padX - 330, 60)) drawFuelPump(ctx, padX - 330, groundY, time);
   if (visible(padX + 380, 140)) drawOreDepot(ctx, padX + 380, groundY, accent, time);
-  if (visible(padX + 680, 110)) drawGarage(ctx, padX + 680, groundY, accent);
+  if (visible(padX + 680, 110)) drawGarage(ctx, padX + 680, groundY, accent, time);
   drawDerrick(ctx, padX, groundY, accent, time);
 
   // Lamp posts and fence segments
@@ -220,7 +243,7 @@ export function drawSurfaceBase(
     if (visible(padX + (a + b) / 2, (b - a) / 2)) drawFence(ctx, padX + a, padX + b, groundY);
   }
 
-  // Workers pacing between buildings
+  // Workers pacing between buildings (wave when pod is at the surface!)
   for (let i = 0; i < 4; i++) {
     const [from, to] = i === 0 ? [-470, -330] : i === 1 ? [230, 420] : i === 2 ? [-250, -120] : [520, 650];
     const speed = 22 + i * 6;
@@ -228,7 +251,10 @@ export function drawSurfaceBase(
     const phase = (time * speed + i * 97) % (span * 2);
     const forward = phase < span;
     const x = padX + from + (forward ? phase : span * 2 - phase);
-    if (visible(x, 10)) drawWorker(ctx, x, groundY, forward ? 1 : -1, time * 9 + i, i);
+    const isNearPad = i === 1 || i === 2;
+    if (visible(x, 10)) {
+      drawWorker(ctx, x, groundY, forward ? 1 : -1, time * 9 + i, i, podAtSurface && isNearPad);
+    }
   }
 
   ctx.restore();
@@ -333,15 +359,29 @@ function drawFuelPump(ctx: CanvasRenderingContext2D, x: number, g: number, time:
   ctx.beginPath();
   ctx.ellipse(x - 12, g - 78, 18, 7, -0.2, 0, Math.PI * 2);
   ctx.fill();
+
+  // Glowing sight-tube with rising green fuel bubbles
+  ctx.fillStyle = '#0d2614';
+  ctx.fillRect(x + 24, g - 82, 6, 24);
+  const fuelLvl = 15 + Math.sin(time * 2.2) * 4;
+  ctx.fillStyle = '#00e676';
+  ctx.fillRect(x + 25, g - 58 - fuelLvl, 4, fuelLvl);
+  const bY = g - 60 - ((time * 18) % Math.max(4, fuelLvl));
+  ctx.fillStyle = '#b9f6ca';
+  ctx.fillRect(x + 26, bY, 2, 2);
+
   ctx.fillStyle = '#e8f5e9';
   ctx.font = '700 11px "Chakra Petch", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('FUEL', x, g - 66);
-  // Pump box with blinking light
+  ctx.fillText('FUEL', x - 4, g - 66);
+  // Pump box with blinking light & animated meter bar
   outlinedRect(ctx, x + 40, g - 40, 22, 40, '#d84315');
-  ctx.fillStyle = Math.sin(time * 4) > 0 ? '#69f0ae' : '#1b5e20';
-  ctx.fillRect(x + 46, g - 34, 10, 6);
+  ctx.fillStyle = '#102027';
+  ctx.fillRect(x + 44, g - 35, 14, 10);
+  ctx.fillStyle = Math.sin(time * 4) > 0 ? '#69f0ae' : '#00e676';
+  const barW = 4 + Math.abs(Math.sin(time * 3.1)) * 8;
+  ctx.fillRect(x + 45, g - 32, barW, 4);
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -389,6 +429,21 @@ function drawDerrick(ctx: CanvasRenderingContext2D, x: number, g: number, accent
   ctx.moveTo(x, g - h);
   ctx.lineTo(x, g - 40);
   ctx.stroke();
+
+  // Swaying auxiliary crane hook on right side of derrick
+  const sway = Math.sin(time * 1.8) * 5;
+  ctx.strokeStyle = '#263238';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x + 18, g - h + 2);
+  ctx.lineTo(x + 18 + sway, g - h + 46);
+  ctx.stroke();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(x + 18 + sway, g - h + 50, 4, 0, Math.PI * 1.3);
+  ctx.stroke();
+
   ctx.save();
   ctx.translate(x, g - h - 22);
   ctx.rotate(time * 1.5);
@@ -402,11 +457,28 @@ function drawDerrick(ctx: CanvasRenderingContext2D, x: number, g: number, accent
   ctx.lineTo(0, 11);
   ctx.stroke();
   ctx.restore();
-  ctx.fillStyle = Math.sin(time * 3) > 0 ? '#ff5252' : '#5d1010';
+
+  // Rotating red warning beacon light cone at derrick peak
+  const beaconOn = Math.sin(time * 3.5) > -0.2;
+  if (beaconOn) {
+    ctx.save();
+    ctx.translate(x, g - h - 38);
+    const beamDir = Math.sin(time * 3.5);
+    ctx.fillStyle = 'rgba(255, 82, 82, 0.22)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(beamDir * 44, -14);
+    ctx.lineTo(beamDir * 44, 14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = beaconOn ? '#ff5252' : '#5d1010';
   ctx.beginPath();
   ctx.arc(x, g - h - 38, 4, 0, Math.PI * 2);
   ctx.fill();
-  // Pad slabs with hazard stripes, leaving the shaft mouth open
+
+  // Pad slabs with hazard stripes + periodic hydraulic steam vents
   for (const dir of [-1, 1]) {
     const x0 = dir < 0 ? x - 176 : x + 112;
     outlinedRect(ctx, x0, g - 10, 64, 10, '#263238');
@@ -425,15 +497,48 @@ function drawDerrick(ctx: CanvasRenderingContext2D, x: number, g: number, accent
       ctx.fill();
     }
     ctx.restore();
+
+    // Hydraulic pad steam vent puff
+    const steamCycle = (time * 0.7 + (dir < 0 ? 0 : 0.5)) % 1;
+    if (steamCycle < 0.45) {
+      const p = steamCycle / 0.45;
+      const vx = dir < 0 ? x - 112 - p * 18 : x + 112 + p * 18;
+      const vy = g - 8 - p * 14;
+      ctx.fillStyle = `rgba(224, 242, 241, ${(1 - p) * 0.45})`;
+      ctx.beginPath();
+      ctx.arc(vx, vy, 3.5 + p * 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 
 function drawOreDepot(ctx: CanvasRenderingContext2D, x: number, g: number, accent: string, time: number): void {
-  // Silo
   const sx = x + 70;
+  // Smokestack chimney behind silo with rising smoke rings
+  outlinedRect(ctx, sx + 10, g - 162, 14, 34, '#37474f');
+  for (let s = 0; s < 3; s++) {
+    const p = (time * 0.45 + s * 0.33) % 1;
+    const puffX = sx + 17 + Math.sin(time * 1.5 + s * 2) * 5 + p * 12;
+    const puffY = g - 166 - p * 38;
+    ctx.fillStyle = `rgba(207, 216, 220, ${(1 - p) * 0.42})`;
+    ctx.beginPath();
+    ctx.arc(puffX, puffY, 4 + p * 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Silo
   outlinedRect(ctx, sx - 34, g - 120, 68, 120, '#90a4ae');
   ctx.fillStyle = '#78909c';
   for (let i = 0; i < 4; i++) ctx.fillRect(sx - 32, g - 112 + i * 28, 64, 4);
+
+  // Glowing molten smelter furnace window near base of silo
+  const furnacePulse = 0.75 + Math.sin(time * 7) * 0.25;
+  outlinedRect(ctx, sx - 16, g - 34, 32, 20, '#263238');
+  ctx.fillStyle = `rgba(255, 109, 0, ${furnacePulse.toFixed(2)})`;
+  ctx.fillRect(sx - 13, g - 31, 26, 14);
+  ctx.fillStyle = '#fff59d';
+  ctx.fillRect(sx - 8, g - 26, 16, 6);
+
   ctx.fillStyle = '#546e7a';
   ctx.beginPath();
   ctx.moveTo(sx - 38, g - 120);
@@ -504,7 +609,7 @@ function drawOreDepot(ctx: CanvasRenderingContext2D, x: number, g: number, accen
   outlinedRect(ctx, x0 - 22, g - 12, 24, 12, '#37474f');
 }
 
-function drawGarage(ctx: CanvasRenderingContext2D, x: number, g: number, accent: string): void {
+function drawGarage(ctx: CanvasRenderingContext2D, x: number, g: number, accent: string, time = 0): void {
   const w = 170;
   const h = 86;
   const left = x - w / 2;
@@ -519,10 +624,44 @@ function drawGarage(ctx: CanvasRenderingContext2D, x: number, g: number, accent:
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 2.5;
   ctx.stroke();
-  // Roll-up door
-  outlinedRect(ctx, x - 52, g - 64, 104, 64, '#b0bec5');
+
+  // Spinning rotary exhaust fan on left wall
+  ctx.save();
+  ctx.translate(left + 19, g - 52);
+  ctx.fillStyle = '#263238';
+  ctx.beginPath();
+  ctx.arc(0, 0, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+  ctx.rotate(time * 5.5);
+  ctx.strokeStyle = '#90a4ae';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-7, 0);
+  ctx.lineTo(7, 0);
+  ctx.moveTo(0, -7);
+  ctx.lineTo(0, 7);
+  ctx.stroke();
+  ctx.restore();
+
+  // Roll-up door (slightly ajar at the bottom showing interior welding sparks)
+  outlinedRect(ctx, x - 52, g - 64, 104, 64, '#161b22');
+  outlinedRect(ctx, x - 52, g - 64, 104, 54, '#b0bec5');
   ctx.fillStyle = '#90a4ae';
-  for (let i = 0; i < 8; i++) ctx.fillRect(x - 50, g - 60 + i * 8, 100, 3);
+  for (let i = 0; i < 6; i++) ctx.fillRect(x - 50, g - 60 + i * 8, 100, 3);
+
+  // Periodic welding flash & spark inside the open bay gap
+  if (Math.sin(time * 13) > 0.35) {
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.55)';
+    ctx.fillRect(x - 48, g - 10, 96, 9);
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(x + Math.sin(time * 7) * 20, g - 5, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // Hazard header
   ctx.fillStyle = accent;
   ctx.fillRect(x - 52, g - 70, 104, 6);
@@ -572,7 +711,8 @@ function drawWorker(
   g: number,
   dir: number,
   walk: number,
-  variant: number
+  variant: number,
+  waving = false
 ): void {
   const step = Math.sin(walk);
   const bob = Math.abs(step) * 1.5;
@@ -605,17 +745,28 @@ function drawWorker(
   ctx.arc(0, -33, 6, Math.PI, 0);
   ctx.fill();
   ctx.stroke();
-  // Pickaxe over the shoulder
-  ctx.strokeStyle = '#6d4c41';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-4, -16);
-  ctx.lineTo(6, -34);
-  ctx.stroke();
-  ctx.strokeStyle = '#90a4ae';
-  ctx.beginPath();
-  ctx.moveTo(1, -37);
-  ctx.quadraticCurveTo(7, -36, 11, -30);
-  ctx.stroke();
+  if (waving) {
+    // Wave arm enthusiastically at the pod
+    const waveAngle = -0.9 + Math.sin(walk * 2.2) * 0.45;
+    ctx.strokeStyle = suit;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(4, -23);
+    ctx.lineTo(4 + Math.cos(waveAngle) * 10, -23 + Math.sin(waveAngle) * 10);
+    ctx.stroke();
+  } else {
+    // Pickaxe over the shoulder
+    ctx.strokeStyle = '#6d4c41';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-4, -16);
+    ctx.lineTo(6, -34);
+    ctx.stroke();
+    ctx.strokeStyle = '#90a4ae';
+    ctx.beginPath();
+    ctx.moveTo(1, -37);
+    ctx.quadraticCurveTo(7, -36, 11, -30);
+    ctx.stroke();
+  }
   ctx.restore();
 }

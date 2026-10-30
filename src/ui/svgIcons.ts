@@ -64,6 +64,20 @@ export const SVG_ICONS: Record<string, string> = {
   planet: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none"><circle cx="12" cy="12" r="6" fill="#00e5ff"/><ellipse cx="12" cy="12" rx="10.5" ry="4" transform="rotate(-25 12 12)" stroke="#eceff1" stroke-width="1.8"/></svg>`,
 
   compass: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="12" cy="12" r="7" stroke="#00e5ff" stroke-width="2"/><path d="M12 2V6M12 18V22M2 12H6M18 12H22" stroke="#eceff1" stroke-width="2" stroke-linecap="round"/></svg>`,
+
+  drill_power: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none"><polygon points="6,3 18,3 12,21" fill="#ff7043"/><path d="M8 8L16 11M9.5 13L14.5 15" stroke="#fff3e0" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+
+  bore_width: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M3 12H21M3 12L7 8M3 12L7 16M21 12L17 8M21 12L17 16" stroke="#ffca28" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+
+  refinery: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none"><polygon points="12,2 20,9 12,22 4,9" fill="#ffd54f" stroke="#fff8e1" stroke-width="1.5"/></svg>`,
+
+  scanner: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none"><circle cx="12" cy="12" r="8" stroke="#00e5ff" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#00e5ff"/></svg>`,
+
+  music: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M9 18V5L20 3V16" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="#eceff1"/><circle cx="17" cy="16" r="3" fill="#eceff1"/></svg>`,
+
+  haptics: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><rect x="7" y="4" width="10" height="16" rx="2" stroke="#eceff1" stroke-width="2"/><path d="M3 8L1 12L3 16M21 8L23 12L21 16" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+
+  globe: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="12" cy="12" r="9" stroke="#00e5ff" stroke-width="2"/><path d="M3 12H21M12 3C14.5 6 14.5 18 12 21C9.5 18 9.5 6 12 3Z" stroke="#eceff1" stroke-width="1.6"/></svg>`,
 };
 
 export const CORE_DIVER_LOGO_SVG = `

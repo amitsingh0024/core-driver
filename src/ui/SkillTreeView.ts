@@ -72,6 +72,7 @@ export class SkillTreeView {
   public selectedNodeId = 'drill_torque_1';
   public hoveredNodeId: string | null = null;
   private celebrations = new Map<string, number>();
+  private seenNodes = new Set<string>(['starter_pod']);
   private animTime = 0;
   private nodeSpacing = 116;
 
@@ -92,6 +93,7 @@ export class SkillTreeView {
   /** Plays a short burst ring on a node that was just bought. */
   public celebrate(nodeId: string): void {
     this.celebrations.set(nodeId, this.animTime);
+    this.seenNodes.add(nodeId);
   }
 
   public resetCamera(): void {
@@ -156,6 +158,7 @@ export class SkillTreeView {
         if (hit) {
           const isSecondTap = this.selectedNodeId === hit.id;
           this.selectedNodeId = hit.id;
+          this.seenNodes.add(hit.id);
           this.onSelectOrBuyCallback(hit, isSecondTap);
         }
       }
@@ -312,6 +315,15 @@ export class SkillTreeView {
       ctx.lineTo(w, y);
     }
     ctx.stroke();
+
+    // Floating background blueprint data motes
+    for (let m = 0; m < 18; m++) {
+      const mx = (((m * 197 + this.animTime * 9 + this.panX * 0.25) % w) + w) % w;
+      const my = (((m * 311 - this.animTime * 11 + this.panY * 0.25) % h) + h) % h;
+      const pulse = 0.15 + 0.2 * Math.sin(this.animTime * 2.4 + m);
+      ctx.fillStyle = m % 3 === 0 ? `rgba(0, 229, 255, ${pulse.toFixed(2)})` : `rgba(245, 166, 35, ${(pulse * 0.8).toFixed(2)})`;
+      ctx.fillRect(mx, my, 2, 2);
+    }
 
     ctx.translate(cx, cy);
     ctx.scale(this.zoom, this.zoom);
@@ -492,12 +504,22 @@ export class SkillTreeView {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Selection Ring
+      // Selection Ring + Rotating Segmented Tech Reticle
       if (isSelected) {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2;
         this.traceBranchShape(ctx, node.branch, radius + 5);
         ctx.stroke();
+
+        ctx.save();
+        ctx.rotate(this.animTime * 1.1);
+        ctx.strokeStyle = bCol.main;
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([7, 9]);
+        ctx.beginPath();
+        ctx.arc(0, 0, radius + 11, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       }
 
       // Purchase burst: two expanding rings for 0.6s
@@ -524,12 +546,29 @@ export class SkillTreeView {
         drawStateGlyph(ctx, radius * 0.78, -radius * 0.78, ev.state, ev.level > 0, ev.canAfford);
       }
 
-      // Draw Icon inside node
+      // Draw HD Skill Icon inside node (32x32 display)
       const iconCanvas = this.atlas.skillIcons.get(node.icon);
       if (iconCanvas) {
         ctx.globalAlpha = ev.state === 'LOCKED_VISIBLE' ? 0.45 : 1.0;
-        ctx.drawImage(iconCanvas, -14, -16, 28, 28);
+        ctx.drawImage(iconCanvas, -16, -18, 32, 32);
         ctx.globalAlpha = 1.0;
+      }
+
+      // "NEW" tag on newly revealed available nodes (Page 13)
+      if (ev.state === 'AVAILABLE' && ev.level === 0 && !this.seenNodes.has(node.id)) {
+        ctx.save();
+        ctx.fillStyle = '#00e676';
+        ctx.strokeStyle = '#07140c';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(-radius - 4, -radius - 6, 28, 13, 4);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#041b0c';
+        ctx.font = '800 9px "Chakra Petch", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('NEW', -radius + 10, -radius + 3.5);
+        ctx.restore();
       }
 
       // Lock Badge or Level Pill at bottom of node

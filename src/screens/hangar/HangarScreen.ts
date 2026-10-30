@@ -8,6 +8,7 @@ import {
 } from '../../config/skillTree';
 import { GameContext } from '../../core/GameContext';
 import { SkillTreeView, BRANCH_COLORS } from '../../ui/SkillTreeView';
+import { SVG_ICONS } from '../../ui/svgIcons';
 import { $ } from '../../ui/dom';
 import { SettingsForm } from '../SettingsForm';
 import { GarageTab } from './GarageTab';
@@ -148,9 +149,9 @@ export class HangarScreen {
       const met = this.game.save.highestUnlockedPlanet >= node.minPlanet;
       const div = document.createElement('div');
       div.className = `lock-pill ${met ? 'met' : ''}`;
-      div.textContent = `${met ? '✓' : 'LOCKED:'} Unlock Planet ${node.minPlanet} (${
+      div.innerHTML = `${met ? SVG_ICONS.check : SVG_ICONS.planet_lock} <span>Unlock Planet ${node.minPlanet} (${
         PLANETS[node.minPlanet - 1]?.name
-      })`;
+      })</span>`;
       locksBox.appendChild(div);
     }
 
@@ -160,9 +161,9 @@ export class HangarScreen {
       const met = haveLv >= node.requiresSkill.minLevel;
       const div = document.createElement('div');
       div.className = `lock-pill ${met ? 'met' : ''}`;
-      div.textContent = `${met ? '✓' : 'LOCKED:'} Requires ${reqNode?.name} Lv ${
+      div.innerHTML = `${met ? SVG_ICONS.check : SVG_ICONS.lock} <span>Requires ${reqNode?.name} Lv ${
         node.requiresSkill.minLevel
-      } (${haveLv}/${node.requiresSkill.minLevel})`;
+      } (${haveLv}/${node.requiresSkill.minLevel})</span>`;
       locksBox.appendChild(div);
     }
 
@@ -174,9 +175,9 @@ export class HangarScreen {
       const names = node.requiresNodesAll.map((id) => SKILL_NODE_MAP[id]?.name ?? id).join(' + ');
       const div = document.createElement('div');
       div.className = `lock-pill ${met ? 'met' : ''}`;
-      div.textContent = `${met ? '✓' : 'LOCKED'} (${ownedCount}/${
+      div.innerHTML = `${met ? SVG_ICONS.check : SVG_ICONS.lock} <span>(${ownedCount}/${
         node.requiresNodesAll.length
-      }): Buy ${names}`;
+      }) Buy ${names}</span>`;
       locksBox.appendChild(div);
     }
 
@@ -206,27 +207,27 @@ export class HangarScreen {
     const telGrid = document.getElementById('telemetry-grid')!;
     telGrid.innerHTML = `
       <div class="telemetry-item">
-        <div class="telemetry-label">DRILL POWER</div>
+        <div class="telemetry-label">${SVG_ICONS.drill_power} DRILL POWER</div>
         <div class="telemetry-val">${Math.round(this.game.stats.drillPower).toLocaleString()} DPS</div>
       </div>
       <div class="telemetry-item">
-        <div class="telemetry-label">BORE DIAMETER</div>
+        <div class="telemetry-label">${SVG_ICONS.bore_width} BORE DIAMETER</div>
         <div class="telemetry-val">${Math.round(this.game.stats.drillRadiusPx * 2)}px</div>
       </div>
       <div class="telemetry-item">
-        <div class="telemetry-label">MAX FUEL TANK</div>
+        <div class="telemetry-label">${SVG_ICONS.fuel} MAX FUEL TANK</div>
         <div class="telemetry-val">${this.game.stats.maxFuel.toLocaleString()} U</div>
       </div>
       <div class="telemetry-item">
-        <div class="telemetry-label">CARGO HOLD</div>
+        <div class="telemetry-label">${SVG_ICONS.cargo} CARGO HOLD</div>
         <div class="telemetry-val">${this.game.stats.maxCargo} Ores</div>
       </div>
       <div class="telemetry-item">
-        <div class="telemetry-label">REFINERY MULT</div>
+        <div class="telemetry-label">${SVG_ICONS.refinery} REFINERY MULT</div>
         <div class="telemetry-val">×${this.game.stats.oreValueMultiplier.toFixed(2)}</div>
       </div>
       <div class="telemetry-item">
-        <div class="telemetry-label">GRID REVEALED</div>
+        <div class="telemetry-label">${SVG_ICONS.scanner} GRID REVEALED</div>
         <div class="telemetry-val">${revealedCount} / ${SKILL_NODES.length}</div>
       </div>
     `;

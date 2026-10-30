@@ -30,6 +30,7 @@ export class DiveScreen {
   private recordToastShown = false;
   private cargoToastShown = false;
   private startBestDepth = 0;
+  private displayedHaulValue = 0;
   private coach = { active: false, shown: new Set<string>(), timer: 0, elapsed: 0 };
 
   constructor(
@@ -64,6 +65,8 @@ export class DiveScreen {
     $('pause-modal').classList.toggle('hidden', !paused);
     if (paused) {
       this.input.clear();
+      const totalCredsEl = document.getElementById('pause-total-credits');
+      if (totalCredsEl) totalCredsEl.textContent = `$${this.game.save.cash.toLocaleString()}`;
       this.onPauseOpened();
     }
   }
@@ -84,6 +87,7 @@ export class DiveScreen {
     $('hud-contract-reward').textContent = `+$${this.contract.reward.toLocaleString()}`;
     this.endTransitionTimer = 0;
     this.finished = false;
+    this.displayedHaulValue = 0;
     this.currentStratumId = planet.strata[0].id;
     this.stratumBannerTimer = 0;
     $('stratum-banner').classList.remove('show');
@@ -363,6 +367,7 @@ export class DiveScreen {
 
     const fuelFill = $('hud-fuel-fill');
     fuelFill.style.width = `${fuelPct}%`;
+    fuelFill.classList.toggle('burning', this.pod.isMoving || this.pod.isDrilling);
 
     const fuelWrapper = $('fuel-bar-wrapper');
     const fuelWarning = $('hud-fuel-warning');
@@ -382,17 +387,39 @@ export class DiveScreen {
       fuelFill.style.background = 'linear-gradient(90deg, #00c853, #69f0ae)';
     }
 
-    // Cargo Hold + Mini Fill Bar + Full Flash
+    // Cargo Hold + Mini Fill Bar + Last Mined Ore Gem + Full Flash
     $('hud-cargo-text').textContent =
       `${this.pod.cargoUsed} / ${this.pod.maxCargo}`;
     const cargoPct = Math.min(100, (this.pod.cargoUsed / Math.max(1, this.pod.maxCargo)) * 100);
     $('hud-cargo-mini-fill').style.width = `${cargoPct}%`;
-    document
-      .getElementById('hud-cargo-pill')!
-      .classList.toggle('cargo-full', this.pod.cargoUsed >= this.pod.maxCargo);
+    const cargoPill = document.getElementById('hud-cargo-pill')!;
+    cargoPill.classList.toggle('cargo-full', this.pod.cargoUsed >= this.pod.maxCargo);
+    cargoPill.classList.toggle('cargo-catch-pop', this.feel.cargoCatchPulse > 0.35);
 
-    const haulVal = this.haulValue();
-    $('hud-haul-value').textContent = `$${(haulVal + this.pod.relicCredits).toLocaleString()}`;
+    const lastOreCanvas = document.getElementById('hud-last-ore-canvas') as HTMLCanvasElement | null;
+    if (lastOreCanvas) {
+      const lctx = lastOreCanvas.getContext('2d');
+      if (lctx) {
+        lctx.clearRect(0, 0, lastOreCanvas.width, lastOreCanvas.height);
+        if (this.pod.lastMinedOreId) {
+          const gem = this.game.atlas.oreOverlays.get(this.pod.lastMinedOreId);
+          if (gem) {
+            lctx.drawImage(gem, 1, 1, 18, 18);
+          }
+        }
+      }
+    }
+
+    const targetHaul = this.haulValue() + this.pod.relicCredits;
+    if (this.displayedHaulValue < targetHaul) {
+      const step = Math.max(1, Math.ceil((targetHaul - this.displayedHaulValue) * 0.22));
+      this.displayedHaulValue = Math.min(targetHaul, this.displayedHaulValue + step);
+    } else {
+      this.displayedHaulValue = targetHaul;
+    }
+    $('hud-haul-value').textContent = `$${this.displayedHaulValue.toLocaleString()}`;
+    const haulPill = document.getElementById('hud-haul-pill');
+    if (haulPill) haulPill.classList.toggle('haul-ticking', this.displayedHaulValue < targetHaul);
 
     const progress = this.contractState();
     $('hud-contract-progress').textContent = contractProgressText(this.contract, progress);
@@ -404,6 +431,8 @@ export class DiveScreen {
     // Vertical Depth Meter Markers
     const depthPct = Math.min(100, (this.pod.depthMeters / planet.maxDepth) * 100);
     $('depth-marker-pod').style.top = `${depthPct}%`;
+    const depthReadout = document.getElementById('depth-pod-readout');
+    if (depthReadout) depthReadout.textContent = `${this.pod.depthMeters}m`;
 
     const bestDepth = Math.max(
       this.pod.maxDepthReached,
@@ -413,7 +442,9 @@ export class DiveScreen {
     $('depth-marker-best').style.top = `${bestPct}%`;
 
     // Circular Radial SVG Extract Progress Ring (circumference = 2 * PI * 44 = 276.46)
-    $('btn-hold-extract').classList.toggle('beacon-charged', this.pod.beaconCharges > 0);
+    const extractBtn = $('btn-hold-extract');
+    extractBtn.classList.toggle('beacon-charged', this.pod.beaconCharges > 0);
+    extractBtn.classList.toggle('extracting', this.pod.extractProgress > 0.01);
 
     const radialCircle = $('extract-radial-circle');
     const offset = 276.46 * (1 - Math.max(0, Math.min(1, this.pod.extractProgress)));
