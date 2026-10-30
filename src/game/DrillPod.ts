@@ -242,6 +242,9 @@ export class DrillPod {
     } else if (this.x > maxWorldX) {
       this.x = maxWorldX;
     }
+    // Bedrock floor sits below the core rows; drilling skips it, so clamp here
+    const maxWorldY = (world.coreStartRow + 4) * TILE_SIZE - TILE_SIZE * 0.5;
+    if (this.y > maxWorldY) this.y = maxWorldY;
 
     this.depthMeters = Math.max(0, Math.floor((this.y / TILE_SIZE) * METERS_PER_ROW));
     if (this.depthMeters > this.maxDepthReached) {
@@ -257,7 +260,7 @@ export class DrillPod {
       hazardMult = 1.0 + 0.65 * (1 - stats.voidHazardReduction);
     }
 
-    const thrustBurn = 1.6 * stats.fuelBurnMultiplier * hazardMult;
+    const thrustBurn = 2.0 * stats.fuelBurnMultiplier * hazardMult;
     const drillingBurn = this.isDrilling
       ? stratum.fuelDrainPerSec * stats.fuelBurnMultiplier * hazardMult
       : 0;

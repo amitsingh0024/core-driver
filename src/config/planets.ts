@@ -71,7 +71,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#361f10',
           bgWall: '#24150c',
         },
-        oreDensity: 0.24,
+        oreDensity: 0.17,
         oreWeights: { coal: 75, copper: 25 },
       },
       {
@@ -90,7 +90,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#573619',
           bgWall: '#2e1d0f',
         },
-        oreDensity: 0.26,
+        oreDensity: 0.19,
         oreWeights: { coal: 35, copper: 50, iron: 15 },
       },
       {
@@ -109,7 +109,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#2b2f36',
           bgWall: '#1b1e24',
         },
-        oreDensity: 0.28,
+        oreDensity: 0.21,
         oreWeights: { copper: 25, iron: 55, silver: 20 },
       },
       {
@@ -128,7 +128,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#18131a',
           bgWall: '#140f17',
         },
-        oreDensity: 0.30,
+        oreDensity: 0.23,
         oreWeights: { iron: 30, silver: 50, gold: 20 },
       },
       {
@@ -147,7 +147,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#1c0a07',
           bgWall: '#1c0906',
         },
-        oreDensity: 0.34,
+        oreDensity: 0.27,
         oreWeights: { silver: 35, gold: 65 },
       },
     ],
@@ -185,7 +185,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#335d75',
           bgWall: '#112533',
         },
-        oreDensity: 0.25,
+        oreDensity: 0.18,
         oreWeights: { cobalt: 75, platinum: 25 },
       },
       {
@@ -204,7 +204,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#1d3d57',
           bgWall: '#0d1e2e',
         },
-        oreDensity: 0.27,
+        oreDensity: 0.20,
         oreWeights: { cobalt: 35, platinum: 50, aquamarine: 15 },
       },
       {
@@ -223,7 +223,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#12243d',
           bgWall: '#091526',
         },
-        oreDensity: 0.29,
+        oreDensity: 0.22,
         oreWeights: { platinum: 25, aquamarine: 55, titanium: 20 },
       },
       {
@@ -242,7 +242,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#0a1329',
           bgWall: '#060c1c',
         },
-        oreDensity: 0.31,
+        oreDensity: 0.24,
         oreWeights: { aquamarine: 30, titanium: 50, cryo_diamond: 20 },
       },
       {
@@ -261,7 +261,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#050914',
           bgWall: '#040814',
         },
-        oreDensity: 0.35,
+        oreDensity: 0.28,
         oreWeights: { titanium: 35, cryo_diamond: 65 },
       },
     ],
@@ -299,7 +299,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#171015',
           bgWall: '#140c12',
         },
-        oreDensity: 0.26,
+        oreDensity: 0.19,
         oreWeights: { uranium: 75, ruby: 25 },
       },
       {
@@ -318,7 +318,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#0e0817',
           bgWall: '#0f081a',
         },
-        oreDensity: 0.28,
+        oreDensity: 0.21,
         oreWeights: { uranium: 35, ruby: 50, mythril: 15 },
       },
       {
@@ -337,7 +337,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#1a0710',
           bgWall: '#17060f',
         },
-        oreDensity: 0.30,
+        oreDensity: 0.23,
         oreWeights: { ruby: 25, mythril: 55, painite: 20 },
       },
       {
@@ -356,7 +356,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#061117',
           bgWall: '#07131a',
         },
-        oreDensity: 0.32,
+        oreDensity: 0.25,
         oreWeights: { mythril: 30, painite: 50, voidstone: 20 },
       },
       {
@@ -375,7 +375,7 @@ export const PLANETS: PlanetConfig[] = [
           bevel: '#04000a',
           bgWall: '#06010d',
         },
-        oreDensity: 0.36,
+        oreDensity: 0.29,
         oreWeights: { painite: 35, voidstone: 65 },
       },
     ],

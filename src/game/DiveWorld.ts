@@ -176,8 +176,8 @@ export class DiveWorld {
           continue;
         }
 
-        // Fuel Cell Canisters (approx 2.2% of tiles)
-        if (gy >= 5 && gy < this.coreStartRow - 1 && r >= 0.032 && r < 0.054) {
+        // Fuel Cell Canisters (approx 1.4% of tiles)
+        if (gy >= 5 && gy < this.coreStartRow - 1 && r >= 0.032 && r < 0.046) {
           const cellHp = Math.max(8, Math.round(stratum.baseHp * 0.65));
           row.push({
             gx,
@@ -272,7 +272,7 @@ export class DiveWorld {
     for (let gy = 2; gy < this.coreStartRow - 2; gy++) {
       for (let gx = 2; gx < WORLD_COLS - 2; gx++) {
         const b = this.grid[gy][gx];
-        if (b.type === 'rock' && b.oreId && !b.armored && this.rand() < 0.32) {
+        if (b.type === 'rock' && b.oreId && !b.armored && this.rand() < 0.25) {
           const nx = gx + (this.rand() < 0.5 ? -1 : 1);
           const nb = this.grid[gy][nx];
           if (nb && nb.type === 'rock' && !nb.oreId && !nb.armored) {

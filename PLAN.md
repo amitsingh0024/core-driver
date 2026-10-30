@@ -45,3 +45,18 @@ Goal: every dive should feel chunky, have a target, and hold one surprise. Based
 
 ## 4. Code Structure (Oct 2026)
 `main.ts` is now a 5-line bootstrap. `core/Game.ts` routes between screens; `core/GameContext.ts` holds the save, stats, sprites, sound and particles; `core/Input.ts` owns keyboard and pointer state. Each screen lives in `screens/` (`TitleScreen`, `DiveScreen`, `ResultsScreen`, `SettingsForm`, `hangar/*Tab`), dive drawing is in `render/DiveRenderer.ts`, and dive settlement is a pure function in `game/DivePayout.ts`. New dive features go in `game/` (`DiveContract.ts`, `GameFeel.ts`).
+
+## 5. Balance Pass (Oct 2026)
+Goal: fuel is the dive's clock again, not an afterthought. Measured with a headless bot driving the real `DrillPod` over 6 seeds per rig.
+- **Ore share** ~34% → ~26% of tiles: every stratum's `oreDensity` −0.07, vein spread 32% → 25%. Cargo fills deeper, so fuel matters before cargo does.
+- **Fuel cells** 2.2% → 1.4% of tiles, base refill 22% → 18% of tank. Cell Siphon +30% → +20% per level.
+- **Thrust burn** 1.6/s → 2.0/s. Fuel Injector −12% → −9% per level.
+- **Fix:** the pod could slip past the core's sides and fall through the bedrock floor (depth readings of 3000m+). Now clamped to the floor.
+
+| Rig (P1) | Before | After |
+|---|---|---|
+| Starter | cargo full at 90m with 46% fuel left | runs dry ~130m with ~15/18 cargo; winch timing matters |
+| Early (T1 maxed) | cargo full at ~300m, 44% fuel | runs dry ~375m with ~50/58 cargo |
+| Late P1 (T1+T2 maxed) | cargo full at ~285m, 95% fuel | cargo full at ~390m, 91% fuel; core runs (~800m) run out of fuel near the core |
+
+On Pyra (P2) a realistic entry rig now gets ~0.8 tanks from cells per dive (was ~1.8) and a mid-P2 rig ends a full-cargo dive with ~59% fuel (was 82%). Fully maxed rigs stay cargo-bound by design.
