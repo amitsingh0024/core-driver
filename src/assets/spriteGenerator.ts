@@ -144,6 +144,26 @@ export class SpriteAtlas {
     }
   }
 
+  /** Re-draws a flat icon as neon: a coloured glow behind it and a bright inner core on top. */
+  private neonize(src: HTMLCanvasElement): HTMLCanvasElement {
+    const [c, ctx] = this.createHDCanvas(src.width, src.height);
+    for (const blur of [10, 4]) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(255, 46, 136, 0.55)';
+      ctx.shadowBlur = blur;
+      ctx.drawImage(src, 0, 0);
+      ctx.restore();
+    }
+    // Lighten the fill toward white at its centre so each shape reads as a lit tube
+    ctx.globalCompositeOperation = 'source-atop';
+    const g = ctx.createRadialGradient(src.width / 2, src.height / 2, 2, src.width / 2, src.height / 2, src.width / 2);
+    g.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+    g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, src.width, src.height);
+    return c;
+  }
+
   private drawCrystalPolygon(
     ctx: CanvasRenderingContext2D,
     cx: number,
@@ -397,7 +417,7 @@ export class SpriteAtlas {
       }
 
       ctx.restore();
-      this.skillIcons.set(t, c);
+      this.skillIcons.set(t, this.neonize(c));
     }
   }
 

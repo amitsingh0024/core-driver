@@ -490,15 +490,19 @@ export class SkillTreeView {
         ctx.strokeStyle = bCol.main;
         ctx.lineWidth = 3;
       } else if (ev.canAfford) {
-        ctx.strokeStyle = '#69f0ae';
+        ctx.strokeStyle = '#39ff88';
         ctx.lineWidth = 3;
       } else {
-        ctx.strokeStyle = '#8a9198';
+        ctx.strokeStyle = '#7d6bc4';
         ctx.lineWidth = 2.5;
       }
 
+      // Neon tube: the border glows in its own colour
+      ctx.shadowColor = ctx.strokeStyle as string;
+      ctx.shadowBlur = 10;
       this.traceBranchShape(ctx, node.branch, radius);
       ctx.stroke();
+      ctx.shadowBlur = 0;
       ctx.setLineDash([]);
 
       // Selection Ring
