@@ -51,6 +51,12 @@ export class DiveScreen {
     );
     this.input.bindExtractButton($('btn-hold-extract'));
 
+    // The depth gauge starts below the top HUD, whose height changes as it wraps on phones
+    const hudTop = $('dive-hud-top');
+    new ResizeObserver(() => {
+      $('dive-screen').style.setProperty('--hud-top-h', `${hudTop.offsetHeight}px`);
+    }).observe(hudTop);
+
     $('btn-pause-dive').addEventListener('click', () => this.setPaused(!this.isPaused));
     $('btn-close-pause').addEventListener('click', () => this.setPaused(false));
     $('btn-pause-resume').addEventListener('click', () => this.setPaused(false));
@@ -102,8 +108,10 @@ export class DiveScreen {
     $('hud-planet-dot').style.boxShadow = `0 0 10px ${planet.accentColor}`;
     $('hud-core-dist').textContent = `${planet.maxDepth}m`;
 
+    // Hard-edged bands, one per stratum, so the gauge reads like a core sample
+    const n = planet.strata.length;
     const stops = planet.strata
-      .map((s, idx) => `${s.palette.base} ${Math.round((idx / (planet.strata.length - 1)) * 100)}%`)
+      .map((s, idx) => `${s.palette.base} ${(idx / n) * 100}% ${((idx + 1) / n) * 100}%`)
       .join(', ');
     $('depth-meter-track').style.background = `linear-gradient(180deg, ${stops})`;
 
@@ -348,7 +356,9 @@ export class DiveScreen {
   /** HUD elements looked up once; the HUD updates every frame. */
   private hud = {
     stratumName: $('hud-stratum-name'),
+    depthValue: $('hud-depth-value'),
     fuelText: $('hud-fuel-text'),
+    fuelStatus: $('hud-fuel-status'),
     fuelFill: $('hud-fuel-fill'),
     fuelWrapper: $('fuel-bar-wrapper'),
     fuelWarning: $('hud-fuel-warning'),
@@ -370,17 +380,18 @@ export class DiveScreen {
     const planet = this.world.planet;
     const { stratum } = this.world.getStratumForDepth(this.pod.depthMeters);
 
-    setText(hud.stratumName, `${stratum.name} • ${this.pod.depthMeters}m`);
+    setText(hud.stratumName, stratum.name);
+    setText(hud.depthValue, `${this.pod.depthMeters}`);
 
     // Segmented Fuel Bar + Live Burn Rate (0 when idle!)
     const fuelPct = Math.max(0, Math.min(100, (this.pod.fuel / this.pod.maxFuel) * 100));
-    const statusLabel = this.pod.isDrilling
-      ? `DRILL (-${this.pod.currentFuelBurnRate.toFixed(1)}/s)`
-      : this.pod.isMoving
-      ? `THRUST (-${this.pod.currentFuelBurnRate.toFixed(1)}/s)`
-      : 'IDLE (0/s)';
+    const burnState = this.pod.isDrilling ? 'DRILL' : this.pod.isMoving ? 'THRUST' : 'IDLE';
+    const statusLabel =
+      burnState === 'IDLE' ? 'IDLE' : `${burnState} −${this.pod.currentFuelBurnRate.toFixed(1)}/s`;
 
-    setText(hud.fuelText, `${Math.ceil(this.pod.fuel)} / ${this.pod.maxFuel} • ${statusLabel}`);
+    setText(hud.fuelText, `${Math.ceil(this.pod.fuel)}/${this.pod.maxFuel}`);
+    setText(hud.fuelStatus, statusLabel);
+    if (hud.fuelStatus.dataset.state !== burnState) hud.fuelStatus.dataset.state = burnState;
     setStyle(hud.fuelFill, 'width', `${fuelPct.toFixed(1)}%`);
 
     const level = fuelPct <= 25 ? 'low' : fuelPct <= 40 ? 'warn' : 'ok';
@@ -391,10 +402,10 @@ export class DiveScreen {
       hud.fuelFill,
       'background',
       level === 'low'
-        ? 'linear-gradient(90deg, #d50000, #ff5252)'
+        ? 'linear-gradient(180deg, #ff8a65 0%, #e0412f 45%, #a8231a 100%)'
         : level === 'warn'
-        ? 'linear-gradient(90deg, #ff8f00, #ffd54f)'
-        : 'linear-gradient(90deg, #00c853, #69f0ae)'
+        ? 'linear-gradient(180deg, #ffe08a 0%, #f6b916 45%, #b9780a 100%)'
+        : 'linear-gradient(180deg, #b6f27a 0%, #5cb83a 45%, #2f7a1f 100%)'
     );
 
     // Cargo Hold + Mini Fill Bar + Full Flash

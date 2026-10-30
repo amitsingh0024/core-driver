@@ -69,38 +69,52 @@ export const SVG_ICONS: Record<string, string> = {
 export const CORE_DIVER_LOGO_SVG = `
 <svg viewBox="0 0 760 220" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="logoMetal" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="logoSteel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7a8188"/>
+      <stop offset="18%" stop-color="#555b62"/>
+      <stop offset="100%" stop-color="#33373c"/>
+    </linearGradient>
+    <linearGradient id="logoPaint" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe07a"/>
+      <stop offset="50%" stop-color="#f6b916"/>
+      <stop offset="100%" stop-color="#d48f06"/>
+    </linearGradient>
+    <linearGradient id="logoChrome" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="48%" stop-color="#cfd8dc"/>
-      <stop offset="52%" stop-color="#78909c"/>
-      <stop offset="100%" stop-color="#eceff1"/>
+      <stop offset="50%" stop-color="#dfe3e6"/>
+      <stop offset="52%" stop-color="#a7aeb5"/>
+      <stop offset="100%" stop-color="#eef0f2"/>
     </linearGradient>
-    <linearGradient id="logoAmber" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffe082"/>
-      <stop offset="55%" stop-color="#f5a623"/>
-      <stop offset="100%" stop-color="#e65100"/>
-    </linearGradient>
-    <filter id="logoGlow" x="-15%" y="-15%" width="130%" height="130%">
-      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000000" flood-opacity="0.85"/>
+    <pattern id="logoHazard" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="14" height="28" fill="#f6b916"/>
+      <rect x="14" width="14" height="28" fill="#1d1d1f"/>
+    </pattern>
+    <filter id="logoDrop" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="0" flood-color="#000" flood-opacity="0.45"/>
     </filter>
   </defs>
-  <g filter="url(#logoGlow)">
-    <!-- Beveled Backing Shield -->
-    <polygon points="40,34 720,34 742,56 742,164 720,186 40,186 18,164 18,56" fill="#0d131f" stroke="#f5a623" stroke-width="4"/>
-    <!-- Hazard Stripe Accent Bar -->
-    <rect x="34" y="46" width="692" height="10" fill="#f5a623" opacity="0.85"/>
-    <!-- Central Drill Icon Emblem on Left -->
-    <g transform="translate(95, 115)">
-      <circle cx="0" cy="-16" r="32" fill="#f5a623" stroke="#18202c" stroke-width="5"/>
-      <circle cx="0" cy="-18" r="16" fill="#00e5ff" stroke="#18202c" stroke-width="4"/>
-      <polygon points="-28,12 28,12 0,62" fill="url(#logoMetal)" stroke="#18202c" stroke-width="5"/>
-      <line x1="-18" y1="24" x2="18" y2="32" stroke="#18202c" stroke-width="4"/>
-      <line x1="-10" y1="40" x2="10" y2="46" stroke="#18202c" stroke-width="4"/>
+  <g filter="url(#logoDrop)">
+    <!-- Bolted steel sign -->
+    <path d="M38 22h684l24 24v128l-24 24H38l-24-24V46z" fill="url(#logoSteel)" stroke="#17191c" stroke-width="7"/>
+    <path d="M42 30h676l18 18v8H24v-8z" fill="url(#logoHazard)" stroke="#17191c" stroke-width="4"/>
+    <g fill="#c9ced3" stroke="#17191c" stroke-width="3">
+      <circle cx="40" cy="80" r="6"/><circle cx="720" cy="80" r="6"/>
+      <circle cx="40" cy="172" r="6"/><circle cx="720" cy="172" r="6"/>
     </g>
-    <!-- Wordmark Text -->
-    <text x="155" y="128" font-family="'Chakra Petch', 'Rajdhani', sans-serif" font-weight="900" font-size="76" letter-spacing="4" fill="url(#logoAmber)" stroke="#090d16" stroke-width="8" paint-order="stroke">CORE</text>
-    <text x="392" y="128" font-family="'Chakra Petch', 'Rajdhani', sans-serif" font-weight="900" font-size="76" letter-spacing="4" fill="url(#logoMetal)" stroke="#090d16" stroke-width="8" paint-order="stroke">DIVER</text>
-    <text x="160" y="164" font-family="'Rajdhani', 'Inter', sans-serif" font-weight="700" font-size="18" letter-spacing="7" fill="#00e5ff">PLANETARY EXCAVATION CONTRACTORS</text>
+    <!-- Drill emblem -->
+    <g transform="translate(108, 118)">
+      <circle cx="0" cy="-14" r="34" fill="url(#logoPaint)" stroke="#17191c" stroke-width="6"/>
+      <circle cx="0" cy="-16" r="15" fill="#4fd8f0" stroke="#17191c" stroke-width="5"/>
+      <circle cx="-5" cy="-21" r="4" fill="#ffffff"/>
+      <polygon points="-26,16 26,16 0,64" fill="url(#logoChrome)" stroke="#17191c" stroke-width="6" stroke-linejoin="round"/>
+      <line x1="-16" y1="28" x2="16" y2="34" stroke="#17191c" stroke-width="4"/>
+      <line x1="-9" y1="43" x2="9" y2="47" stroke="#17191c" stroke-width="4"/>
+    </g>
+    <!-- Wordmark -->
+    <text x="172" y="134" textLength="530" lengthAdjust="spacingAndGlyphs" font-family="'Bungee', sans-serif" font-size="78" fill="url(#logoPaint)" stroke="#17191c" stroke-width="10" stroke-linejoin="round" paint-order="stroke">CORE <tspan fill="url(#logoChrome)">DIVER</tspan></text>
+    <!-- Tagline plate -->
+    <rect x="172" y="148" width="530" height="30" rx="4" fill="#17191c"/>
+    <text x="437" y="171" text-anchor="middle" textLength="500" lengthAdjust="spacingAndGlyphs" font-family="'Barlow Condensed', sans-serif" font-weight="800" font-size="22" letter-spacing="6" fill="#f6b916">PLANETARY EXCAVATION CONTRACTORS</text>
   </g>
 </svg>
 `;

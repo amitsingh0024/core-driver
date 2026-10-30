@@ -17,13 +17,13 @@ export class ResultsScreen {
     const outcomeTitle = $('results-outcome-title');
     if (reason === 'core_shattered') {
       outcomeTitle.textContent = `${planet.coreName.toUpperCase()} SHATTERED!`;
-      outcomeTitle.style.color = '#ffd54f';
+      outcomeTitle.dataset.outcome = 'core';
     } else if (reason === 'fuel_out') {
       outcomeTitle.textContent = 'FUEL DEPLETED — EMERGENCY TOW';
-      outcomeTitle.style.color = '#ff8a80';
+      outcomeTitle.dataset.outcome = 'tow';
     } else {
       outcomeTitle.textContent = 'SAFE WINCH EXTRACTION';
-      outcomeTitle.style.color = '#69f0ae';
+      outcomeTitle.dataset.outcome = 'safe';
     }
 
     $('results-depth-line').textContent =
@@ -93,7 +93,7 @@ export class ResultsScreen {
     if (payout.rows.length === 0 && payout.bonuses.length === 0) {
       listBox.innerHTML = `
         <div class="manifest-row">
-          <span style="color:#90a4ae">No ores collected during this dive.</span>
+          <span class="manifest-empty">No ores collected during this dive.</span>
           <span>0</span>
           <span>—</span>
           <span>$0</span>
@@ -119,7 +119,6 @@ export class ResultsScreen {
         oreCell.appendChild(thumb);
       }
       const nameSpan = document.createElement('span');
-      nameSpan.style.color = row.color;
       nameSpan.textContent = row.lost > 0 ? `${row.name} (-${row.lost} lost)` : row.name;
       oreCell.appendChild(nameSpan);
 
@@ -128,8 +127,6 @@ export class ResultsScreen {
       const unitSpan = document.createElement('span');
       unitSpan.textContent = `$${row.unitVal.toLocaleString()}`;
       const subSpan = document.createElement('span');
-      subSpan.style.color = '#69f0ae';
-      subSpan.style.fontWeight = '700';
       subSpan.textContent = `+$${row.subtotal.toLocaleString()}`;
 
       div.append(oreCell, qtySpan, unitSpan, subSpan);
@@ -141,10 +138,10 @@ export class ResultsScreen {
       row.className = 'manifest-row tabular bonus-row';
       row.style.animationDelay = `${(payout.rows.length + idx) * 55}ms`;
       row.innerHTML = `
-        <div class="manifest-ore-cell" style="color:${bonus.color}">${bonus.label}</div>
+        <div class="manifest-ore-cell">${bonus.label}</div>
         <span>×1</span>
         <span>$${bonus.amount.toLocaleString()}</span>
-        <span style="color:${bonus.color};font-weight:700">+$${bonus.amount.toLocaleString()}</span>
+        <span>+$${bonus.amount.toLocaleString()}</span>
       `;
       listBox.appendChild(row);
     });

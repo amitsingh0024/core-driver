@@ -82,7 +82,11 @@ export class SettingsForm {
       `;
 
       container.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((inp) => {
+        // WebKit has no range-progress pseudo element, so the fader fill comes from a variable
+        const paintFill = () => inp.style.setProperty('--fill', `${inp.value}%`);
+        paintFill();
         inp.addEventListener('input', () => {
+          paintFill();
           this.game.save.settings[inp.dataset.setting as SliderKey] = Number(inp.value);
           this.applyToRuntime();
           this.game.persist();

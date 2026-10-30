@@ -284,29 +284,35 @@ export class SkillTreeView {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // 1. Deep Grid Background
-    ctx.fillStyle = '#080c14';
+    // 1. Deep Grid Background: a blueprint sheet, lit from the middle
+    const sheet = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.75);
+    sheet.addColorStop(0, '#24496f');
+    sheet.addColorStop(1, '#122a44');
+    ctx.fillStyle = sheet;
     ctx.fillRect(0, 0, w, h);
 
     const cx = w * 0.5 + this.panX;
     const cy = h * 0.5 + this.panY;
 
-    // Subtle Blueprint Grid Lines
-    const gridStep = 58 * this.zoom;
-    const offsetX = ((cx % gridStep) + gridStep) % gridStep;
-    const offsetY = ((cy % gridStep) + gridStep) % gridStep;
-    ctx.strokeStyle = 'rgba(45, 68, 102, 0.2)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = offsetX; x < w; x += gridStep) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-    }
-    for (let y = offsetY; y < h; y += gridStep) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-    }
-    ctx.stroke();
+    // Blueprint grid: fine minor lines with a heavier major line every fourth
+    const drawGrid = (step: number, color: string, width: number) => {
+      const ox = ((cx % step) + step) % step;
+      const oy = ((cy % step) + step) % step;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      for (let x = ox; x < w; x += step) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+      }
+      for (let y = oy; y < h; y += step) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+      }
+      ctx.stroke();
+    };
+    drawGrid(29 * this.zoom, 'rgba(160, 200, 240, 0.08)', 1);
+    drawGrid(116 * this.zoom, 'rgba(170, 210, 250, 0.2)', 1.5);
 
     ctx.translate(cx, cy);
     ctx.scale(this.zoom, this.zoom);
@@ -337,9 +343,9 @@ export class SkillTreeView {
         pos.y + driftY,
         74
       );
-      fogGrad.addColorStop(0, 'rgba(13, 21, 36, 0.85)');
-      fogGrad.addColorStop(0.6, 'rgba(10, 16, 28, 0.45)');
-      fogGrad.addColorStop(1, 'rgba(8, 12, 20, 0)');
+      fogGrad.addColorStop(0, 'rgba(12, 28, 48, 0.8)');
+      fogGrad.addColorStop(0.6, 'rgba(12, 28, 48, 0.4)');
+      fogGrad.addColorStop(1, 'rgba(12, 28, 48, 0)');
       ctx.fillStyle = fogGrad;
       ctx.beginPath();
       ctx.arc(pos.x + driftX, pos.y + driftY, 74, 0, Math.PI * 2);
@@ -352,7 +358,7 @@ export class SkillTreeView {
       });
       if (isFrontier) {
         const pPos = this.getNodeWorldPos(SKILL_NODE_MAP[node.revealFrom[0]]);
-        ctx.strokeStyle = 'rgba(84, 110, 122, 0.18)';
+        ctx.strokeStyle = 'rgba(200, 225, 250, 0.3)';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 6]);
         ctx.beginPath();
@@ -361,16 +367,18 @@ export class SkillTreeView {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = 'rgba(18, 28, 44, 0.8)';
-        ctx.strokeStyle = 'rgba(84, 110, 122, 0.35)';
+        ctx.fillStyle = 'rgba(18, 42, 68, 0.9)';
+        ctx.strokeStyle = 'rgba(200, 225, 250, 0.55)';
         ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, 18, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+        ctx.setLineDash([]);
 
-        ctx.fillStyle = 'rgba(144, 164, 174, 0.45)';
-        ctx.font = '800 13px "Chakra Petch", sans-serif';
+        ctx.fillStyle = 'rgba(200, 225, 250, 0.7)';
+        ctx.font = '15px "Bungee", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('?', pos.x, pos.y + 5);
       }
@@ -454,13 +462,19 @@ export class SkillTreeView {
         ctx.fill();
       }
 
+      // Heavy dark outline under the border, matching the sprites' ink lines
+      ctx.strokeStyle = '#17191c';
+      ctx.lineWidth = 7;
+      this.traceBranchShape(ctx, node.branch, radius);
+      ctx.stroke();
+
       // Node Body in Branch Shape
       ctx.fillStyle =
         ev.state === 'LOCKED_VISIBLE'
-          ? '#161922'
+          ? '#2a2d31'
           : ev.level > 0
           ? bCol.bg
-          : '#111722';
+          : '#3b4046';
       this.traceBranchShape(ctx, node.branch, radius);
       ctx.fill();
 
@@ -479,8 +493,8 @@ export class SkillTreeView {
         ctx.strokeStyle = '#69f0ae';
         ctx.lineWidth = 3;
       } else {
-        ctx.strokeStyle = '#546e7a';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#8a9198';
+        ctx.lineWidth = 2.5;
       }
 
       this.traceBranchShape(ctx, node.branch, radius);
@@ -528,18 +542,18 @@ export class SkillTreeView {
       }
 
       // Lock Badge or Level Pill at bottom of node
-      ctx.font = '800 10px "Rajdhani", "Inter", system-ui, sans-serif';
+      ctx.font = '800 11px "Barlow Condensed", system-ui, sans-serif';
       ctx.textAlign = 'center';
 
       if (ev.state === 'LOCKED_VISIBLE') {
         const isPlanetLock = node.minPlanet > save.highestUnlockedPlanet;
         const badgeText = isPlanetLock ? `PLANET ${node.minPlanet} LOCK` : 'REQ LOCKED';
-        ctx.fillStyle = isPlanetLock ? '#006064' : '#4a121b';
-        ctx.fillRect(-36, radius - 10, 72, 15);
-        ctx.strokeStyle = isPlanetLock ? '#00e5ff' : '#ff5252';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(-36, radius - 10, 72, 15);
-        ctx.fillStyle = isPlanetLock ? '#84ffff' : '#ff8a80';
+        ctx.fillStyle = isPlanetLock ? '#1f4f7a' : '#7a1f17';
+        ctx.fillRect(-38, radius - 10, 76, 16);
+        ctx.strokeStyle = '#17191c';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-38, radius - 10, 76, 16);
+        ctx.fillStyle = isPlanetLock ? '#cfe6ff' : '#ffd2c9';
         ctx.fillText(badgeText, 0, radius + 1);
       } else {
         const pillText =
@@ -548,29 +562,37 @@ export class SkillTreeView {
             : ev.state === 'MAXED'
             ? 'MAX'
             : `${ev.level}/${ev.maxLevel}`;
-        ctx.fillStyle = '#0b101b';
-        ctx.fillRect(-22, radius - 10, 44, 15);
-        ctx.strokeStyle = ev.state === 'MAXED' ? '#ffd54f' : bCol.main;
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(-22, radius - 10, 44, 15);
-        ctx.fillStyle = ev.state === 'MAXED' ? '#ffd54f' : '#ffffff';
+        // LCD level plate
+        ctx.fillStyle = '#141a12';
+        ctx.fillRect(-23, radius - 10, 46, 16);
+        ctx.strokeStyle = '#17191c';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-23, radius - 10, 46, 16);
+        ctx.fillStyle = ev.state === 'MAXED' || node.id === 'starter_pod' ? '#ffc24a' : '#9cff7a';
         ctx.fillText(pillText, 0, radius + 1);
       }
 
       // Node Title & Cost below node
-      ctx.font = '700 11px "Inter", system-ui, sans-serif';
-      ctx.fillStyle = ev.state === 'LOCKED_VISIBLE' ? '#90a4ae' : '#eceff1';
-      ctx.fillText(node.name, 0, radius + 18);
+      // Labels get a dark keyline so they read on the blueprint
+      ctx.font = '800 13px "Barlow Condensed", system-ui, sans-serif';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(14, 30, 50, 0.95)';
+      ctx.lineWidth = 4;
+      ctx.strokeText(node.name.toUpperCase(), 0, radius + 20);
+      ctx.fillStyle = ev.state === 'LOCKED_VISIBLE' ? '#a9bfd6' : '#f5ecd7';
+      ctx.fillText(node.name.toUpperCase(), 0, radius + 20);
 
       if (ev.state !== 'MAXED') {
-        ctx.font = '700 11px "Rajdhani", "Inter", system-ui, sans-serif';
+        ctx.font = '800 13px "Barlow Condensed", system-ui, sans-serif';
+        const costText = `$${ev.nextCost.toLocaleString()}`;
+        ctx.strokeText(costText, 0, radius + 34);
         ctx.fillStyle =
           ev.state === 'LOCKED_VISIBLE'
-            ? '#ff8a80'
+            ? '#ff9a8a'
             : ev.canAfford
-            ? '#69f0ae'
-            : '#b0bec5';
-        ctx.fillText(`$${ev.nextCost.toLocaleString()}`, 0, radius + 31);
+            ? '#9cff7a'
+            : '#ffc24a';
+        ctx.fillText(costText, 0, radius + 34);
       }
 
       ctx.restore();

@@ -5,21 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Core Diver — Planetary Mining Incremental</title>
     <meta name="description" content="Steer a drill rig through layered planets, haul rare ore before your fuel runs dry, and shatter each planet's core." />
-    <meta name="theme-color" content="#070a12" />
+    <meta name="theme-color" content="#121416" />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23070a12'/%3E%3Cpath d='M18 14h28v18L32 52 18 32z' fill='%23f5a623'/%3E%3Ccircle cx='32' cy='26' r='6' fill='%2300e5ff'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23121416'/%3E%3Cpath d='M18 14h28v18L32 52 18 32z' fill='%23f6b916'/%3E%3Ccircle cx='32' cy='26' r='6' fill='%234fd8f0'/%3E%3C/svg%3E"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@500;600;700;800&family=Rajdhani:wght@600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="preload" as="image" href="./sprites/strata_rocks_hd.webp" type="image/webp" crossorigin="anonymous" />
     <link rel="preload" as="image" href="./sprites/drill_pods_hd.webp" type="image/webp" crossorigin="anonymous" />
     <link rel="preload" as="image" href="./sprites/ores_gems_hd.webp" type="image/webp" crossorigin="anonymous" />
     <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/theme.css" />
   </head>
   <body>
     <div id="app" style="--planet-accent: #f5a623">
@@ -96,7 +97,7 @@
 
         <!-- First-dive coaching tips -->
         <div id="coach-tip" class="coach-tip">
-          <span class="coach-tag">TIP</span>
+          <span class="coach-tag">FOREMAN</span>
           <span class="coach-text" id="coach-text"></span>
         </div>
 
@@ -111,40 +112,41 @@
           </div>
         </div>
 
-        <!-- Top Slimmed HUD Bar -->
-        <header class="dive-hud-top">
-          <!-- Top-Left: Pause Button + Planet/Stratum Chip -->
+        <!-- Top HUD: depth plate, fuel gauge, cargo bin and haul ticket -->
+        <header class="dive-hud-top" id="dive-hud-top">
           <div class="hud-left">
-            <button id="btn-pause-dive" class="hud-icon-btn" title="Pause Dive (ESC)">
+            <button id="btn-pause-dive" class="hud-icon-btn" title="Pause Dive (ESC)" aria-label="Pause dive">
               <span class="btn-icon" data-svg="pause"></span>
             </button>
             <div class="planet-badge steel-chip" id="hud-planet-badge">
-              <span class="planet-dot" id="hud-planet-dot"></span>
-              <div>
-                <div class="planet-title" id="hud-planet-name">TERRA-VEIN</div>
-                <div class="stratum-title tabular" id="hud-stratum-name">Topsoil Loam • 0m</div>
+              <div class="depth-counter tabular"><span id="hud-depth-value">0</span><small>m</small></div>
+              <div class="planet-badge-text">
+                <div class="planet-title"><span class="planet-dot" id="hud-planet-dot"></span><span id="hud-planet-name">TERRA-VEIN</span></div>
+                <div class="stratum-title" id="hud-stratum-name">Topsoil Loam</div>
               </div>
             </div>
           </div>
 
-          <!-- Top-Center: Segmented Fuel Bar -->
           <div class="fuel-bar-wrapper steel-chip" id="fuel-bar-wrapper">
             <div class="fuel-bar-header">
               <span class="fuel-title">
                 <span class="inline-svg" data-svg="fuel"></span>
-                <span>FUEL TANK</span>
+                <span>FUEL</span>
               </span>
-              <span class="fuel-numbers tabular" id="hud-fuel-text">100 / 100 • IDLE (0/s)</span>
+              <span class="fuel-status" id="hud-fuel-status">IDLE</span>
+              <span class="fuel-numbers tabular" id="hud-fuel-text">100/100</span>
             </div>
-            <div class="fuel-bar-track">
-              <div class="fuel-bar-fill" id="hud-fuel-fill"></div>
-              <div class="fuel-segments-overlay"></div>
+            <div class="fuel-gauge">
+              <span class="gauge-end">E</span>
+              <div class="fuel-bar-track">
+                <div class="fuel-bar-fill" id="hud-fuel-fill"></div>
+                <div class="fuel-segments-overlay"></div>
+              </div>
+              <span class="gauge-end">F</span>
             </div>
-            <div class="fuel-warning-banner hidden" id="hud-fuel-warning">
-              LOW FUEL — HOLD [SPACE] OR EXTRACT BUTTON BEFORE 0%!
-            </div>
+            <div class="fuel-warning-banner hidden" id="hud-fuel-warning">LOW FUEL: WINCH UP NOW</div>
             <div class="hud-contract" id="hud-contract" title="Dive Contract: finish it for a bonus on the Results screen">
-              <span class="contract-tag">CONTRACT</span>
+              <span class="contract-tag">WORK ORDER</span>
               <span class="contract-label" id="hud-contract-label">Reach 60m</span>
               <span class="contract-progress tabular" id="hud-contract-progress">0 / 60m</span>
               <span class="contract-reward tabular" id="hud-contract-reward">+$0</span>
@@ -152,7 +154,6 @@
             </div>
           </div>
 
-          <!-- Top-Right: Cargo Hold + Haul Value + Sound Toggle -->
           <div class="hud-right">
             <div class="stat-pill cargo-pill steel-chip" id="hud-cargo-pill">
               <div class="pill-top-row">
@@ -168,18 +169,18 @@
             <div class="stat-pill haul-pill steel-chip">
               <div class="pill-top-row">
                 <span class="inline-svg" data-svg="coin"></span>
-                <span class="pill-label">DIVE HAUL</span>
+                <span class="pill-label">HAUL</span>
               </div>
               <span class="pill-value tabular" id="hud-haul-value">$0</span>
             </div>
 
-            <button id="btn-mute" class="hud-icon-btn" title="Toggle Audio">
+            <button id="btn-mute" class="hud-icon-btn" title="Toggle Audio" aria-label="Toggle audio">
               <span class="btn-icon" id="mute-icon-slot" data-svg="volumeOn"></span>
             </button>
           </div>
         </header>
 
-        <!-- Right-Edge Vertical Depth Meter -->
+        <!-- Right-edge depth gauge: strata bands, best-depth flag and the pod marker -->
         <aside class="depth-meter-panel steel-chip">
           <div class="depth-meter-title">DEPTH</div>
           <div class="depth-meter-track" id="depth-meter-track">
@@ -193,17 +194,14 @@
           <div class="depth-meter-footer tabular" id="hud-core-dist">800m</div>
         </aside>
 
-        <!-- Bottom Controls Hint & Circular 96x96 Hold-to-Extract Button -->
         <footer class="dive-hud-bottom">
           <div class="controls-hint steel-chip">
-            <span><strong>STEER &amp; DRILL:</strong> Hold WASD / Arrows or Drag Touch/Mouse</span>
-            <span class="divider">•</span>
-            <span><strong>IDLE = 0 FUEL</strong></span>
-            <span class="divider">•</span>
-            <span><strong>SURFACE:</strong> Hold SPACE / E or Extract Button</span>
+            <span><strong>STEER &amp; DRILL</strong> WASD / Arrows / Drag</span>
+            <span><strong>IDLE</strong> burns no fuel</span>
+            <span><strong>WINCH UP</strong> Hold Space / E</span>
           </div>
 
-          <button id="btn-hold-extract" class="extract-circle-btn" title="Hold to Winch Surface (Space / E)">
+          <button id="btn-hold-extract" class="extract-circle-btn" title="Hold to Winch Surface (Space / E)" aria-label="Hold to winch to the surface">
             <svg class="extract-radial-svg" viewBox="0 0 100 100">
               <circle class="extract-radial-bg" cx="50" cy="50" r="44" />
               <circle
@@ -218,8 +216,8 @@
             </svg>
             <div class="extract-circle-content">
               <span class="extract-icon" data-svg="extract"></span>
-              <span class="extract-text">EXTRACT</span>
-              <span class="extract-sub">HOLD [SPACE]</span>
+              <span class="extract-text">WINCH</span>
+              <span class="extract-sub">HOLD</span>
             </div>
           </button>
         </footer>
@@ -244,7 +242,12 @@
               </div>
             </div>
 
-            <!-- Header & Diagonal Stamps -->
+            <!-- Assay receipt: header, stamps, sold ore and the total -->
+            <div class="results-receipt">
+            <div class="receipt-head">
+              <strong>CORE DIVER CO.</strong>
+              <span>ASSAY &amp; WEIGH STATION</span>
+            </div>
             <div class="results-header">
               <div>
                 <div class="results-eyebrow" id="results-planet-label">PLANET 1: TERRA-VEIN • DIVE #1</div>
@@ -274,6 +277,7 @@
                 <span class="results-mult-note" id="results-mult-note">Refinery Multiplier ×1.00</span>
               </div>
               <div class="results-total-amount tabular" id="results-total-payout">+$0</div>
+            </div>
             </div>
 
             <!-- Action Buttons -->
