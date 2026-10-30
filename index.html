@@ -44,9 +44,6 @@
           <div class="title-card steel-panel">
             <div class="hazard-stripe-bar"></div>
             <div id="title-logo-slot" class="title-logo-slot"></div>
-            <p class="title-tagline">
-              DEEP-CRUST PLANETARY EXCAVATION • STEER YOUR RIG • SHATTER THE CORE
-            </p>
             <div class="title-actions">
               <button id="btn-title-play" class="btn-primary btn-amber">
                 <span class="btn-icon" data-svg="play"></span>
@@ -57,9 +54,9 @@
                   <span class="btn-icon" data-svg="grid"></span>
                   <span>OPEN HANGAR HUB</span>
                 </button>
-                <button id="btn-title-settings" class="btn-secondary">
+                <button id="btn-title-settings" class="btn-secondary" title="Settings" aria-label="Settings">
                   <span class="btn-icon" data-svg="settings"></span>
-                  <span>SETTINGS</span>
+                  <span class="title-settings-label">SETTINGS</span>
                 </button>
                 <button id="btn-title-credits" class="btn-secondary">
                   <span class="btn-icon" data-svg="info"></span>
@@ -68,7 +65,6 @@
               </div>
             </div>
             <div class="title-footer">
-              <span>MANUAL THRUST STEERING • 0 FUEL BURN WHEN IDLE</span>
               <span>v2.5.0 • DEEP-GRID MINING SYNDICATE</span>
             </div>
           </div>
@@ -162,6 +158,7 @@
               <div class="cargo-mini-track">
                 <div class="cargo-mini-fill" id="hud-cargo-mini-fill"></div>
               </div>
+              <span class="cargo-cash tabular" id="hud-cargo-cash">$0</span>
             </div>
 
             <div class="stat-pill haul-pill steel-chip">
@@ -242,10 +239,6 @@
 
             <!-- Assay receipt: header, stamps, sold ore and the total -->
             <div class="results-receipt">
-            <div class="receipt-head">
-              <strong>DEEP-GRID SYNDICATE</strong>
-              <span>ORE UPLINK</span>
-            </div>
             <div class="results-header">
               <div>
                 <div class="results-eyebrow" id="results-planet-label">PLANET 1: TERRA-VEIN • DIVE #1</div>
@@ -262,7 +255,6 @@
               <div class="manifest-table-header">
                 <span>REFINED ORE / BOUNTY</span>
                 <span>QTY</span>
-                <span>UNIT VALUE</span>
                 <span>PAYOUT</span>
               </div>
               <div class="manifest-rows" id="results-ore-list"></div>
@@ -282,7 +274,7 @@
             <div class="results-actions">
               <button id="btn-results-hangar" class="btn-primary btn-amber">
                 <span class="btn-icon" data-svg="grid"></span>
-                <span>UPGRADE (DEEP GRID)</span>
+                <span id="results-hangar-label">UPGRADE RIG</span>
               </button>
               <button id="btn-results-redive" class="btn-primary btn-green">
                 <span class="btn-icon" data-svg="rocket"></span>
@@ -294,7 +286,7 @@
       </section>
 
       <!-- ====================================================
-           SCREEN 4: HANGAR HUB (5 TABS + ALWAYS-VISIBLE TOP BAR)
+           SCREEN 4: HANGAR HUB (TABS UNLOCK AS YOU PROGRESS + ALWAYS-VISIBLE TOP BAR)
            ==================================================== -->
       <section id="hangar-screen" class="screen">
         <!-- Always-Visible Top Header Bar -->
@@ -324,6 +316,9 @@
           </div>
 
           <div class="hangar-actions">
+            <button id="btn-hangar-settings" class="hud-icon-btn" title="Settings" aria-label="Settings">
+              <span class="btn-icon" data-svg="settings"></span>
+            </button>
             <button id="btn-launch-dive" class="btn-primary btn-green launch-btn">
               <span class="btn-icon" data-svg="rocket"></span>
               <span>LAUNCH DIVE</span>
@@ -351,16 +346,18 @@
               <span class="nav-icon" data-svg="codex"></span>
               <span class="nav-label">Ore Codex</span>
             </button>
-            <button class="hangar-nav-btn" data-tab="settings">
-              <span class="nav-icon" data-svg="settings"></span>
-              <span class="nav-label">Settings</span>
-            </button>
           </nav>
 
           <!-- TAB 1: DEEP GRID (Hidden Upgrade Tree + Node Inspector) -->
           <div class="hangar-tab-pane active" id="tab-pane-grid">
             <div class="tree-canvas-container">
               <canvas id="skill-tree-canvas"></canvas>
+
+              <!-- First-visit guidance: points new players at their first purchase -->
+              <div id="hangar-coach" class="coach-tip hangar-coach">
+                <span class="coach-tag">FOREMAN</span>
+                <span class="coach-text" id="hangar-coach-text"></span>
+              </div>
 
               <div class="tree-overlay-controls">
                 <div class="tree-legend steel-chip">
@@ -390,18 +387,13 @@
                   <div class="level-pips" id="insp-level-pips"></div>
                 </div>
                 <p class="inspector-desc" id="insp-desc">Increases rotational drill bit torque.</p>
+                <div class="inspector-delta tabular" id="insp-delta"></div>
 
                 <div class="inspector-locks" id="insp-locks"></div>
 
                 <button id="btn-buy-node" class="btn-primary btn-amber buy-node-btn tabular">
                   UPGRADE NODE • $18
                 </button>
-              </div>
-
-              <!-- Live Rig Telemetry Summary -->
-              <div class="telemetry-card steel-panel">
-                <div class="telemetry-header">DRILL RIG TELEMETRY</div>
-                <div class="telemetry-grid tabular" id="telemetry-grid"></div>
               </div>
             </aside>
           </div>
@@ -457,7 +449,7 @@
             </div>
           </div>
 
-          <!-- TAB 5: SETTINGS (Audio, Visuals, Accessibility, Save Data) -->
+          <!-- SETTINGS (opened from the header gear; Audio, Visuals, Accessibility, Save Data) -->
           <div class="hangar-tab-pane" id="tab-pane-settings">
             <div class="settings-container">
               <div class="settings-card steel-panel">

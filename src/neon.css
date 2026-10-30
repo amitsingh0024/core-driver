@@ -94,8 +94,7 @@ body,
 .depth-counter,
 .fuel-numbers,
 .pill-value,
-.cash-value-row,
-.telemetry-val {
+.cash-value-row {
   background: var(--lcd-bg);
   border: 1px solid rgba(0, 240, 255, 0.28);
   border-radius: 4px;
@@ -373,7 +372,6 @@ input[type='range']:focus-visible {
   box-shadow: 0 0 28px rgba(255, 46, 136, 0.28), 0 0 60px rgba(0, 240, 255, 0.12), 0 18px 40px rgba(0, 0, 0, 0.6);
 }
 
-.title-tagline,
 .title-footer {
   color: var(--cream-dim);
   font-family: var(--font-label);
@@ -538,4 +536,172 @@ input[type='range']:focus-visible {
 
 .manifest-table-header {
   border-bottom-color: rgba(0, 240, 255, 0.5);
+}
+
+/* ==========================================================
+   Progressive disclosure: #app carries ui-lock-<feature> until the
+   player earns it (see src/ui/Progression.ts)
+   ========================================================== */
+
+/* Title: first launch shows just the launch button and a settings gear */
+.ui-lock-titleMenu #btn-title-hangar,
+.ui-lock-titleMenu #btn-title-credits,
+.ui-lock-titleMenu .title-settings-label {
+  display: none;
+}
+
+.ui-lock-titleMenu .title-sub-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.ui-lock-titleMenu #btn-title-settings {
+  width: auto;
+  padding: 0 18px;
+  opacity: 0.75;
+}
+
+/* Dive HUD: first dives keep depth, fuel, cargo and the winch */
+.ui-lock-fullHud .hud-contract,
+.ui-lock-fullHud #hud-fuel-status,
+.ui-lock-fullHud .gauge-end,
+.ui-lock-fullHud .planet-badge-text,
+.ui-lock-fullHud .haul-pill,
+.ui-lock-fullHud #btn-mute,
+.ui-lock-fullHud .controls-hint {
+  display: none;
+}
+
+/* With the planet text gone the badge is just the depth readout */
+.ui-lock-fullHud .planet-badge {
+  justify-self: start;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.cargo-cash {
+  display: none;
+  margin-top: 3px;
+  font-family: var(--font-num);
+  font-size: 13px;
+  color: var(--neon-green);
+  text-shadow: 0 0 6px rgba(57, 255, 136, 0.6);
+}
+
+.ui-lock-fullHud .cargo-cash {
+  display: block;
+}
+
+/* Results: the planet label only matters once there is more than one world */
+#app:not(.ui-multi-planet) .results-eyebrow {
+  display: none;
+}
+
+/* Hangar: tabs and the planet switcher appear as they become useful */
+.ui-lock-planetMap .hangar-nav-btn[data-tab='planets'],
+.ui-lock-codex .hangar-nav-btn[data-tab='codex'],
+.ui-lock-garage .hangar-nav-btn[data-tab='garage'],
+#app:not(.ui-multi-planet) #hangar-planet-pill {
+  display: none;
+}
+
+.hangar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hangar-nav-btn {
+  position: relative;
+}
+
+.hangar-nav-btn.has-new::after {
+  content: 'NEW';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--neon-pink);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 10px var(--neon-pink);
+  animation: new-badge-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes new-badge-pulse {
+  50% {
+    box-shadow: 0 0 2px var(--neon-pink);
+    opacity: 0.75;
+  }
+}
+
+/* Inspector: what the next level changes, in place of the full stat sheet */
+.inspector-delta {
+  margin: 10px 0 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: rgba(0, 240, 255, 0.05);
+  font-family: var(--font-label);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cream-dim);
+}
+
+.inspector-delta:empty {
+  display: none;
+}
+
+.inspector-delta div + div {
+  margin-top: 3px;
+}
+
+.inspector-delta b {
+  color: var(--neon-green);
+  text-shadow: 0 0 6px rgba(57, 255, 136, 0.55);
+}
+
+/* Foreman hint over the upgrade tree; reuses the dive coach-tip look, pinned to the top */
+.hangar-coach {
+  top: 14px;
+  bottom: auto;
+  transform: translate(-50%, -8px);
+}
+
+.hangar-coach.show {
+  transform: translate(-50%, 0);
+}
+
+/* Points a new player at the next step: their first upgrade, then the next dive */
+.launch-btn.nudge,
+.results-actions .btn-primary.nudge {
+  animation: nudge-pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes nudge-pulse {
+  50% {
+    transform: scale(1.04);
+    filter: brightness(1.3);
+  }
+}
+
+@media (max-width: 640px) {
+  .hangar-actions {
+    gap: 6px;
+  }
+
+  #btn-hangar-settings {
+    min-width: 40px;
+    width: 40px;
+  }
+
+  .hangar-actions .launch-btn {
+    padding: 8px 10px 10px;
+    font-size: 13px;
+  }
 }

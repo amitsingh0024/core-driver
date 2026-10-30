@@ -13,10 +13,12 @@ import { SettingsForm } from '../SettingsForm';
 import { GarageTab } from './GarageTab';
 import { PlanetMapTab } from './PlanetMapTab';
 import { CodexTab } from './CodexTab';
+import { cheapestAvailableCost, nextLevelChanges } from './upgradeHints';
+import { GATED_TABS, applyUiLocks, isFirstUpgradePending, isNew, isUnlocked, markSeen } from '../../ui/Progression';
 
 export type HangarTab = 'grid' | 'garage' | 'planets' | 'codex' | 'settings';
 
-/** Hangar hub: header, five-tab rail, Deep Grid skill tree with its inspector, and the other tabs. */
+/** Hangar hub: header, tab rail (tabs unlock as the player progresses), Deep Grid skill tree with its inspector, and the other tabs. */
 export class HangarScreen {
   public activeTab: HangarTab = 'grid';
   private skillTreeView: SkillTreeView;
@@ -47,7 +49,16 @@ export class HangarScreen {
   }
 
   public switchTab(tab: HangarTab): void {
+    const gate = GATED_TABS.find((g) => g.tab === tab);
+    if (gate) {
+      if (!isUnlocked(this.game.save, gate.feature)) tab = 'grid';
+      else if (isNew(this.game.save, gate.feature)) {
+        markSeen(this.game.save, gate.feature);
+        this.game.persist();
+      }
+    }
     this.activeTab = tab;
+    $('btn-hangar-settings').classList.toggle('active', tab === 'settings');
     document.querySelectorAll<HTMLButtonElement>('#hangar-nav-rail .hangar-nav-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.tab === tab);
     });
@@ -102,7 +113,7 @@ export class HangarScreen {
     document.getElementById('hangar-planet-dot')!.style.boxShadow = `0 0 10px ${planet.accentColor}`;
 
     this.renderInspector();
-    this.renderTelemetry();
+    this.renderGuidance();
 
     if (this.activeTab === 'garage') this.garage.populate();
     else if (this.activeTab === 'planets') this.planets.populate();
@@ -140,6 +151,7 @@ export class HangarScreen {
     }
 
     document.getElementById('insp-desc')!.textContent = node.description;
+    this.renderStatDelta(node, ev.state === 'MAXED');
 
     const locksBox = document.getElementById('insp-locks')!;
     locksBox.innerHTML = '';
@@ -196,39 +208,36 @@ export class HangarScreen {
     }
   }
 
-  private renderTelemetry(): void {
-    const revealedCount = SKILL_NODES.filter(
-      (n) =>
-        evaluateSkillNode(n, this.game.save.ownedSkills, this.game.save.highestUnlockedPlanet, this.game.save.cash)
-          .state !== 'HIDDEN'
-    ).length;
+  /** "Drill Power 26 → 38": what the next level actually changes, instead of a full stat sheet. */
+  private renderStatDelta(node: SkillNodeConfig, maxed: boolean): void {
+    const box = $('insp-delta');
+    const changes = maxed ? [] : nextLevelChanges(node, this.game.save.ownedSkills);
+    box.innerHTML = changes
+      .slice(0, 3)
+      .map((c) => `<div>${c.label} &nbsp;${c.from} → <b>${c.to}</b></div>`)
+      .join('');
+  }
 
-    const telGrid = document.getElementById('telemetry-grid')!;
-    telGrid.innerHTML = `
-      <div class="telemetry-item">
-        <div class="telemetry-label">DRILL POWER</div>
-        <div class="telemetry-val">${Math.round(this.game.stats.drillPower).toLocaleString()} DPS</div>
-      </div>
-      <div class="telemetry-item">
-        <div class="telemetry-label">BORE DIAMETER</div>
-        <div class="telemetry-val">${Math.round(this.game.stats.drillRadiusPx * 2)}px</div>
-      </div>
-      <div class="telemetry-item">
-        <div class="telemetry-label">MAX FUEL TANK</div>
-        <div class="telemetry-val">${this.game.stats.maxFuel.toLocaleString()} U</div>
-      </div>
-      <div class="telemetry-item">
-        <div class="telemetry-label">CARGO HOLD</div>
-        <div class="telemetry-val">${this.game.stats.maxCargo} Ores</div>
-      </div>
-      <div class="telemetry-item">
-        <div class="telemetry-label">REFINERY MULT</div>
-        <div class="telemetry-val">×${this.game.stats.oreValueMultiplier.toFixed(2)}</div>
-      </div>
-      <div class="telemetry-item">
-        <div class="telemetry-label">GRID REVEALED</div>
-        <div class="telemetry-val">${revealedCount} / ${SKILL_NODES.length}</div>
-      </div>
-    `;
+  /** NEW badges on freshly unlocked tabs, plus Foreman hints that walk a new player to their first upgrade. */
+  private renderGuidance(): void {
+    const save = this.game.save;
+    // A purchase can unlock a tab while the hangar is open
+    applyUiLocks(save);
+    for (const { feature, tab } of GATED_TABS) {
+      document
+        .querySelector(`#hangar-nav-rail .hangar-nav-btn[data-tab='${tab}']`)
+        ?.classList.toggle('has-new', isNew(save, feature));
+    }
+
+    const canAfford = cheapestAvailableCost(save) <= save.cash;
+    const firstBuy = isFirstUpgradePending(save);
+    let hint = '';
+    if (firstBuy && canAfford) hint = 'Tap a glowing node, then UPGRADE, to buy your first upgrade.';
+    else if (save.totalDives <= 2 && !canAfford) hint = 'Launch a dive to earn credits for your next upgrade.';
+
+    const coach = $('hangar-coach');
+    $('hangar-coach-text').textContent = hint;
+    coach.classList.toggle('show', hint !== '' && this.activeTab === 'grid');
+    $('btn-launch-dive').classList.toggle('nudge', save.totalDives <= 2 && !canAfford);
   }
 }

@@ -21,6 +21,8 @@ export interface SaveState {
   totalOresMined: Record<string, number>;
   deepestByPlanet: Record<number, number>;
   totalDives: number;
+  /** Interface unlocks the player has already opened, so their NEW badge stops showing. */
+  seenUnlocks: string[];
   settings: GameSettings;
 }
 
@@ -41,6 +43,7 @@ export function getDefaultSaveState(): SaveState {
     totalOresMined: {},
     deepestByPlanet: { 1: 0, 2: 0, 3: 0 },
     totalDives: 0,
+    seenUnlocks: [],
     settings: {
       sfxVolume: 80,
       musicVolume: 60,
@@ -69,6 +72,8 @@ export class PortalSDK {
         totalOresMined: parsed.totalOresMined ?? {},
         deepestByPlanet: { ...def.deepestByPlanet, ...(parsed.deepestByPlanet ?? {}) },
         totalDives: parsed.totalDives ?? 0,
+        // Saves from before progressive unlocks already know every tab, so skip their NEW badges
+        seenUnlocks: Array.isArray(parsed.seenUnlocks) ? parsed.seenUnlocks : ['planetMap', 'codex', 'garage'],
         settings: { ...def.settings, ...(parsed.settings ?? {}) },
       };
     } catch {

@@ -244,14 +244,6 @@ body,
   display: block;
 }
 
-.title-tagline {
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #b0bec5;
-}
-
 .title-actions {
   width: 100%;
   display: flex;
@@ -904,7 +896,7 @@ body,
 
 .manifest-table-header {
   display: grid;
-  grid-template-columns: 1fr 70px 90px 100px;
+  grid-template-columns: 1fr 70px 110px;
   padding: 8px 14px;
   background: #10192b;
   font-family: var(--font-display);
@@ -923,7 +915,7 @@ body,
 
 .manifest-row {
   display: grid;
-  grid-template-columns: 1fr 70px 90px 100px;
+  grid-template-columns: 1fr 70px 110px;
   align-items: center;
   padding: 7px 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
@@ -1356,43 +1348,6 @@ body,
   color: #78909c;
   box-shadow: none;
   cursor: not-allowed;
-}
-
-.telemetry-card {
-  padding: 13px;
-}
-
-.telemetry-header {
-  font-family: var(--font-display);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-  margin-bottom: 8px;
-}
-
-.telemetry-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-}
-
-.telemetry-item {
-  background: #090e19;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 7px;
-  padding: 6px 9px;
-}
-
-.telemetry-label {
-  font-size: 9.5px;
-  color: var(--text-dim);
-}
-
-.telemetry-val {
-  font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
 }
 
 /* TAB 2: POD GARAGE */
