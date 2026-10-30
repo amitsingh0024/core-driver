@@ -1,0 +1,12 @@
+// Cloudflare Workers static-assets deploy: wrangler runs `npm run build` itself, then uploads dist/.
+{
+  "name": "core-driver",
+  "compatibility_date": "2026-10-01",
+  "build": {
+    "command": "npm run build"
+  },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
