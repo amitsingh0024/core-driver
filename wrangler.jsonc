@@ -9,6 +9,6 @@
     "directory": "./dist",
     "not_found_handling": "single-page-application"
   },
-  // Branch builds run `wrangler preview`, which requires this block even when empty
+  // Required by `wrangler preview`, which Workers Builds runs for non-production branches
   "previews": {}
 }
