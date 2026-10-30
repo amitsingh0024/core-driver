@@ -286,8 +286,8 @@ export class SkillTreeView {
 
     // 1. Deep Grid Background: a blueprint sheet, lit from the middle
     const sheet = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.75);
-    sheet.addColorStop(0, '#24496f');
-    sheet.addColorStop(1, '#122a44');
+    sheet.addColorStop(0, '#1a0b3a');
+    sheet.addColorStop(1, '#07021a');
     ctx.fillStyle = sheet;
     ctx.fillRect(0, 0, w, h);
 
@@ -311,8 +311,8 @@ export class SkillTreeView {
       }
       ctx.stroke();
     };
-    drawGrid(29 * this.zoom, 'rgba(160, 200, 240, 0.08)', 1);
-    drawGrid(116 * this.zoom, 'rgba(170, 210, 250, 0.2)', 1.5);
+    drawGrid(29 * this.zoom, 'rgba(185, 103, 255, 0.08)', 1);
+    drawGrid(116 * this.zoom, 'rgba(255, 46, 136, 0.22)', 1.5);
 
     ctx.translate(cx, cy);
     ctx.scale(this.zoom, this.zoom);
@@ -343,9 +343,9 @@ export class SkillTreeView {
         pos.y + driftY,
         74
       );
-      fogGrad.addColorStop(0, 'rgba(12, 28, 48, 0.8)');
-      fogGrad.addColorStop(0.6, 'rgba(12, 28, 48, 0.4)');
-      fogGrad.addColorStop(1, 'rgba(12, 28, 48, 0)');
+      fogGrad.addColorStop(0, 'rgba(7, 2, 26, 0.85)');
+      fogGrad.addColorStop(0.6, 'rgba(7, 2, 26, 0.45)');
+      fogGrad.addColorStop(1, 'rgba(7, 2, 26, 0)');
       ctx.fillStyle = fogGrad;
       ctx.beginPath();
       ctx.arc(pos.x + driftX, pos.y + driftY, 74, 0, Math.PI * 2);
@@ -358,7 +358,7 @@ export class SkillTreeView {
       });
       if (isFrontier) {
         const pPos = this.getNodeWorldPos(SKILL_NODE_MAP[node.revealFrom[0]]);
-        ctx.strokeStyle = 'rgba(200, 225, 250, 0.3)';
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 6]);
         ctx.beginPath();
@@ -367,8 +367,8 @@ export class SkillTreeView {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = 'rgba(18, 42, 68, 0.9)';
-        ctx.strokeStyle = 'rgba(200, 225, 250, 0.55)';
+        ctx.fillStyle = 'rgba(16, 8, 38, 0.9)';
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.55)';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
@@ -377,8 +377,8 @@ export class SkillTreeView {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = 'rgba(200, 225, 250, 0.7)';
-        ctx.font = '15px "Bungee", sans-serif';
+        ctx.fillStyle = 'rgba(0, 240, 255, 0.75)';
+        ctx.font = '700 14px "Orbitron", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('?', pos.x, pos.y + 5);
       }
@@ -463,7 +463,7 @@ export class SkillTreeView {
       }
 
       // Heavy dark outline under the border, matching the sprites' ink lines
-      ctx.strokeStyle = '#17191c';
+      ctx.strokeStyle = '#05020f';
       ctx.lineWidth = 7;
       this.traceBranchShape(ctx, node.branch, radius);
       ctx.stroke();
@@ -471,10 +471,10 @@ export class SkillTreeView {
       // Node Body in Branch Shape
       ctx.fillStyle =
         ev.state === 'LOCKED_VISIBLE'
-          ? '#2a2d31'
+          ? '#120a2a'
           : ev.level > 0
           ? bCol.bg
-          : '#3b4046';
+          : '#1d1240';
       this.traceBranchShape(ctx, node.branch, radius);
       ctx.fill();
 
@@ -542,7 +542,7 @@ export class SkillTreeView {
       }
 
       // Lock Badge or Level Pill at bottom of node
-      ctx.font = '800 11px "Barlow Condensed", system-ui, sans-serif';
+      ctx.font = '700 11px "Rajdhani", system-ui, sans-serif';
       ctx.textAlign = 'center';
 
       if (ev.state === 'LOCKED_VISIBLE') {
@@ -550,7 +550,7 @@ export class SkillTreeView {
         const badgeText = isPlanetLock ? `PLANET ${node.minPlanet} LOCK` : 'REQ LOCKED';
         ctx.fillStyle = isPlanetLock ? '#1f4f7a' : '#7a1f17';
         ctx.fillRect(-38, radius - 10, 76, 16);
-        ctx.strokeStyle = '#17191c';
+        ctx.strokeStyle = '#05020f';
         ctx.lineWidth = 2;
         ctx.strokeRect(-38, radius - 10, 76, 16);
         ctx.fillStyle = isPlanetLock ? '#cfe6ff' : '#ffd2c9';
@@ -563,27 +563,27 @@ export class SkillTreeView {
             ? 'MAX'
             : `${ev.level}/${ev.maxLevel}`;
         // LCD level plate
-        ctx.fillStyle = '#141a12';
+        ctx.fillStyle = '#05020f';
         ctx.fillRect(-23, radius - 10, 46, 16);
-        ctx.strokeStyle = '#17191c';
+        ctx.strokeStyle = '#05020f';
         ctx.lineWidth = 2;
         ctx.strokeRect(-23, radius - 10, 46, 16);
-        ctx.fillStyle = ev.state === 'MAXED' || node.id === 'starter_pod' ? '#ffc24a' : '#9cff7a';
+        ctx.fillStyle = ev.state === 'MAXED' || node.id === 'starter_pod' ? '#ffd23f' : '#39ff88';
         ctx.fillText(pillText, 0, radius + 1);
       }
 
       // Node Title & Cost below node
       // Labels get a dark keyline so they read on the blueprint
-      ctx.font = '800 13px "Barlow Condensed", system-ui, sans-serif';
+      ctx.font = '700 13px "Rajdhani", system-ui, sans-serif';
       ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'rgba(14, 30, 50, 0.95)';
+      ctx.strokeStyle = 'rgba(7, 2, 26, 0.95)';
       ctx.lineWidth = 4;
       ctx.strokeText(node.name.toUpperCase(), 0, radius + 20);
-      ctx.fillStyle = ev.state === 'LOCKED_VISIBLE' ? '#a9bfd6' : '#f5ecd7';
+      ctx.fillStyle = ev.state === 'LOCKED_VISIBLE' ? '#a99cc9' : '#efe6ff';
       ctx.fillText(node.name.toUpperCase(), 0, radius + 20);
 
       if (ev.state !== 'MAXED') {
-        ctx.font = '800 13px "Barlow Condensed", system-ui, sans-serif';
+        ctx.font = '700 13px "Rajdhani", system-ui, sans-serif';
         const costText = `$${ev.nextCost.toLocaleString()}`;
         ctx.strokeText(costText, 0, radius + 34);
         ctx.fillStyle =

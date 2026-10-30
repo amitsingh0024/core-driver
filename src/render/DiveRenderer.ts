@@ -5,7 +5,7 @@ import { DiveScreen } from '../screens/DiveScreen';
 import { fitCanvasToDisplay, podLayers } from './podView';
 import { drawGroundLip, drawSurfaceBase, drawSurfaceSky } from './SurfaceBase';
 import { DiveWorld } from '../game/DiveWorld';
-import { flatRockTile } from './rockTiles';
+import { mix, neonStratum, oreNeon, rgba } from '../assets/neonArt';
 
 /** Draws one frame of the dive: tiles, core, radar, drones, pod, effects. */
 export class DiveRenderer {
@@ -56,11 +56,10 @@ export class DiveRenderer {
   }
 
   private rockTile(stratumId: string): HTMLCanvasElement | undefined {
-    const src = this.game.atlas.blockTiles.get(stratumId);
-    return src ? flatRockTile(src) : undefined;
+    return this.game.atlas.blockTiles.get(stratumId);
   }
 
-  /** Rock texture darkened for dug-out tunnels, cached per source texture. */
+  /** Rock texture darkened for dug-out tunnels with a faint neon grid, cached per source texture. */
   private wallTile(stratumId: string): HTMLCanvasElement | undefined {
     const src = this.rockTile(stratumId);
     if (!src) return undefined;
@@ -71,8 +70,11 @@ export class DiveRenderer {
       tile.height = src.height;
       const c = tile.getContext('2d')!;
       c.drawImage(src, 0, 0);
-      c.fillStyle = 'rgba(8, 6, 10, 0.78)';
+      c.fillStyle = 'rgba(5, 3, 12, 0.84)';
       c.fillRect(0, 0, tile.width, tile.height);
+      c.strokeStyle = rgba(neonStratum(stratumId).glow, 0.1);
+      c.lineWidth = 2;
+      c.strokeRect(0, 0, tile.width, tile.height);
       this.wallTiles.set(src, tile);
     }
     return tile;
@@ -94,6 +96,54 @@ export class DiveRenderer {
     ctx.setTransform(dpr * fx, 0, 0, dpr * fy, dpr * (sx + half), dpr * (sy + half));
     ctx.drawImage(tex, -half - 0.5, -half - 0.5, TILE_SIZE + 1, TILE_SIZE + 1);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /**
+   * Drawn on top of the darkness so the neon still reads in deep rock: glowing lines along every
+   * rock edge that faces a tunnel, and a soft halo behind each ore.
+   */
+  private drawNeonPass(
+    ctx: CanvasRenderingContext2D,
+    camX: number,
+    camY: number,
+    startGx: number,
+    endGx: number,
+    startGy: number,
+    endGy: number
+  ): void {
+    const { world } = this.dive;
+    const T = TILE_SIZE;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let gy = Math.max(1, startGy); gy <= endGy; gy++) {
+      for (let gx = startGx; gx <= endGx; gx++) {
+        const b = world.getBlock(gx, gy);
+        if (!b || b.type === 'empty' || b.type === 'bedrock') continue;
+        const sx = gx * T - camX;
+        const sy = gy * T - camY;
+        if (b.oreId) {
+          const ore = ORES[b.oreId];
+          if (ore) ctx.drawImage(glowSprite(oreNeon(ore)), sx - T * 0.25, sy - T * 0.25, T * 1.5, T * 1.5);
+        }
+        const up = isOpen(world, gx, gy - 1);
+        const down = isOpen(world, gx, gy + 1);
+        const left = isOpen(world, gx - 1, gy);
+        const right = isOpen(world, gx + 1, gy);
+        if (!(up || down || left || right)) continue;
+        const glow = neonStratum(b.stratumId).glow;
+        ctx.fillStyle = rgba(glow, 0.18);
+        if (up) ctx.fillRect(sx, sy - 3, T, 7);
+        if (down) ctx.fillRect(sx, sy + T - 4, T, 7);
+        if (left) ctx.fillRect(sx - 3, sy, 7, T);
+        if (right) ctx.fillRect(sx + T - 4, sy, 7, T);
+        ctx.fillStyle = rgba(mix(glow, '#ffffff', 0.35), 0.85);
+        if (up) ctx.fillRect(sx, sy, T, 2);
+        if (down) ctx.fillRect(sx, sy + T - 2, T, 2);
+        if (left) ctx.fillRect(sx, sy, 2, T);
+        if (right) ctx.fillRect(sx + T - 2, sy, 2, T);
+      }
+    }
+    ctx.restore();
   }
 
   private drawLighting(
@@ -179,8 +229,8 @@ export class DiveRenderer {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const tint = ctx.createRadialGradient(px, py, 10, px, py, lampR * 0.8);
-    tint.addColorStop(0, 'rgba(255, 210, 140, 0.10)');
-    tint.addColorStop(1, 'rgba(255, 210, 140, 0)');
+    tint.addColorStop(0, 'rgba(120, 240, 255, 0.10)');
+    tint.addColorStop(1, 'rgba(120, 240, 255, 0)');
     ctx.fillStyle = tint;
     ctx.fillRect(px - lampR, py - lampR, lampR * 2, lampR * 2);
 
@@ -191,7 +241,7 @@ export class DiveRenderer {
         const y = ((d.y * h - camY * 0.25 - t * d.speed) % h + h) % h;
         const dist = Math.hypot(x - px, y - py);
         if (dist > lampR) continue;
-        ctx.fillStyle = `rgba(255, 236, 200, ${0.35 * (1 - dist / lampR)})`;
+        ctx.fillStyle = `rgba(160, 250, 255, ${0.4 * (1 - dist / lampR)})`;
         ctx.fillRect(x, y, d.size, d.size);
       }
     }
@@ -259,10 +309,11 @@ export class DiveRenderer {
         }
 
         if (b.type === 'bedrock') {
-          ctx.fillStyle = '#0b0e14';
+          ctx.fillStyle = '#07050f';
           ctx.fillRect(sx, sy, T, T);
-          ctx.fillStyle = 'rgba(255,255,255,0.03)';
-          ctx.fillRect(sx + (hash % 20), sy + ((hash >> 5) % 20), 10, 6);
+          ctx.strokeStyle = 'rgba(185, 103, 255, 0.12)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(sx + 0.5, sy + 0.5, T - 1, T - 1);
           continue;
         }
 
@@ -332,6 +383,7 @@ export class DiveRenderer {
 
     // 2b. Darkness that deepens with depth, cut open by the pod's lamp and by glowing pickups
     this.drawLighting(ctx, w, h, dpr, camX, camY, stratumIndex, startGx, endGx, startGy, endGy);
+    this.drawNeonPass(ctx, camX, camY, startGx, endGx, startGy, endGy);
 
     // 3. Draw Planet Core Integrity Bar when approaching the Core
     if (pod.depthMeters >= planet.maxDepth - 140) {
@@ -746,13 +798,13 @@ function drawArmorPlating(ctx: CanvasRenderingContext2D, x: number, y: number): 
   ctx.save();
   for (const by of [y + T * 0.18, y + T * 0.7]) {
     const g = ctx.createLinearGradient(0, by, 0, by + 7);
-    g.addColorStop(0, '#cfd8dc');
-    g.addColorStop(1, '#607d8b');
+    g.addColorStop(0, '#3a3f66');
+    g.addColorStop(1, '#151730');
     ctx.fillStyle = g;
     ctx.fillRect(x + 1, by, T - 2, 7);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.fillRect(x + 1, by + 7, T - 2, 2);
-    ctx.fillStyle = '#eceff1';
+    ctx.fillStyle = '#00f0ff';
     for (const rx of [x + 6, x + T / 2, x + T - 6]) {
       ctx.beginPath();
       ctx.arc(rx, by + 3.5, 1.6, 0, Math.PI * 2);
@@ -810,7 +862,7 @@ function drawTunnelShadow(
   }
 }
 
-/** Lit lip on exposed rock tops, darker undersides and sides, so tunnels read as carved. */
+/** Dark inner bevel on rock faces that touch a tunnel; the glowing line itself is drawn in the neon pass. */
 function drawRockEdges(
   ctx: CanvasRenderingContext2D,
   world: DiveWorld,
@@ -820,24 +872,11 @@ function drawRockEdges(
   sy: number
 ): void {
   const T = TILE_SIZE;
-  if (gy > 0 && isOpen(world, gx, gy - 1)) {
-    ctx.fillStyle = 'rgba(255, 236, 200, 0.22)';
-    ctx.fillRect(sx, sy, T, 3);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-    ctx.fillRect(sx, sy + 3, T, 2);
-  }
-  if (isOpen(world, gx, gy + 1)) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-    ctx.fillRect(sx, sy + T - 5, T, 5);
-  }
-  if (isOpen(world, gx - 1, gy)) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.fillRect(sx, sy, 3, T);
-  }
-  if (isOpen(world, gx + 1, gy)) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.fillRect(sx + T - 3, sy, 3, T);
-  }
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  if (gy > 0 && isOpen(world, gx, gy - 1)) ctx.fillRect(sx, sy + 2, T, 4);
+  if (isOpen(world, gx, gy + 1)) ctx.fillRect(sx, sy + T - 6, T, 4);
+  if (isOpen(world, gx - 1, gy)) ctx.fillRect(sx + 2, sy, 4, T);
+  if (isOpen(world, gx + 1, gy)) ctx.fillRect(sx + T - 6, sy, 4, T);
 }
 
 /** Draws a pickup or ore smaller than the tile with a little offset, sitting in the rock rather than on it. */
@@ -859,4 +898,23 @@ function drawEmbedded(
   ctx.ellipse(cx + 1.5, cy + size * 0.32, size * 0.36, size * 0.13, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.drawImage(tex, cx - size / 2, cy - size / 2, size, size);
+}
+
+const glowSprites = new Map<string, HTMLCanvasElement>();
+
+/** Soft radial glow in one colour, cached so the neon pass never builds gradients per frame. */
+function glowSprite(color: string): HTMLCanvasElement {
+  let c = glowSprites.get(color);
+  if (!c) {
+    c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d')!;
+    const grad = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+    grad.addColorStop(0, rgba(color, 0.32));
+    grad.addColorStop(1, rgba(color, 0));
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    glowSprites.set(color, c);
+  }
+  return c;
 }

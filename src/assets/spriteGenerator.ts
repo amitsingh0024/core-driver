@@ -1,7 +1,17 @@
-import { PLANETS, PlanetConfig } from '../config/planets';
+import { PLANETS } from '../config/planets';
 import { ORES } from '../config/ores';
 import { SkillIconType } from '../config/skillTree';
 import { TILE_SIZE } from '../game/DiveWorld';
+import {
+  neonBeacon,
+  neonCore,
+  neonDrone,
+  neonFuelCell,
+  neonOre,
+  neonPod,
+  neonRelic,
+  neonRockTile,
+} from './neonArt';
 
 const HD_SIZE = 128;
 
@@ -40,16 +50,14 @@ export class SpriteAtlas {
   public relicChestTile!: HTMLCanvasElement;
   public droneSprites: Map<number, HTMLCanvasElement> = new Map();
   public skillIcons: Map<SkillIconType, HTMLCanvasElement> = new Map();
-  /** Resolves once the PNG atlases are sliced, or once the procedural fallback is in use. */
+  /** Resolves once every texture is drawn (all procedural, so immediately). */
   public readonly ready: Promise<void>;
 
   constructor() {
-    this.generateBlockTilesFallback();
     this.generateCrackTiles();
-    this.generateOreOverlaysFallback();
-    this.generateSpecialTiles();
     this.generateSkillIcons();
-    this.ready = this.loadTransparentPNGSheets();
+    this.generateNeonArt();
+    this.ready = Promise.resolve();
   }
 
   private createHDCanvas(w = HD_SIZE, h = HD_SIZE): [HTMLCanvasElement, CanvasRenderingContext2D] {
@@ -62,102 +70,20 @@ export class SpriteAtlas {
     return [c, ctx];
   }
 
-  private loadImage(src: string): Promise<HTMLImageElement> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => resolve(img);
-      img.onerror = (e) => reject(e);
-      img.src = src;
-    });
-  }
-
-  /** Loads a sheet as WebP (about 6x smaller), falling back to the PNG master if that fails. */
-  private loadSheet(name: string): Promise<HTMLImageElement> {
-    return this.loadImage(`sprites/${name}.webp`).catch(() => this.loadImage(`sprites/${name}.png`));
-  }
-
-  /**
-   * Loads the pre-cut, halo-free transparent atlases from /sprites (WebP, PNG fallback)
-   */
-  private async loadTransparentPNGSheets(): Promise<void> {
-    try {
-      const [podsImg, oresImg, rocksImg] = await Promise.all([
-        this.loadSheet('drill_pods_hd'),
-        this.loadSheet('ores_gems_hd'),
-        this.loadSheet('strata_rocks_hd'),
-      ]);
-
-      // 1. Slice 3 Drill Pods (192x256 master size each in 576x256 sheet)
-      const podW = Math.floor(podsImg.width / 3);
-      const podH = podsImg.height;
-      for (let i = 0; i < 3; i++) {
-        const [c, ctx] = this.createHDCanvas(192, 256);
-        ctx.drawImage(podsImg, i * podW, 0, podW, podH, 0, 0, 192, 256);
-        this.podSprites.set(i + 1, c);
-      }
-
-      // 2. Slice 15 Ores + Fuel Cell (128x128 each in 512x512 4x4 sheet)
-      const oreIdsOrder = [
-        'coal',
-        'copper',
-        'iron',
-        'silver',
-        'gold',
-        'cobalt',
-        'platinum',
-        'aquamarine',
-        'titanium',
-        'cryo_diamond',
-        'uranium',
-        'ruby',
-        'mythril',
-        'painite',
-        'voidstone',
-      ];
-      const cellW = Math.floor(oresImg.width / 4);
-      const cellH = Math.floor(oresImg.height / 4);
-
-      for (let idx = 0; idx < 16; idx++) {
-        const col = idx % 4;
-        const row = Math.floor(idx / 4);
-        const [c, ctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
-        ctx.drawImage(oresImg, col * cellW, row * cellH, cellW, cellH, 0, 0, HD_SIZE, HD_SIZE);
-        if (idx < 15) {
-          this.oreOverlays.set(oreIdsOrder[idx], c);
-        } else {
-          this.fuelCellTile = c;
-        }
-      }
-
-      // 3. Slice 15 Strata Rock & Core Blocks (128x128 each in 640x384 5x3 sheet)
-      const rockW = Math.floor(rocksImg.width / 5);
-      const rockH = Math.floor(rocksImg.height / 3);
-
-      for (let pIdx = 0; pIdx < PLANETS.length; pIdx++) {
-        const planet = PLANETS[pIdx];
-        for (let sIdx = 0; sIdx < planet.strata.length; sIdx++) {
-          const stratum = planet.strata[sIdx];
-          const [c, ctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
-          ctx.drawImage(rocksImg, sIdx * rockW, pIdx * rockH, rockW, rockH, 0, 0, HD_SIZE, HD_SIZE);
-
-          // Apply subtle deep-teal tint shift to p3_voidmantle as specified in Design Doc Page 4
-          if (stratum.id === 'p3_voidmantle') {
-            ctx.fillStyle = 'rgba(0, 180, 216, 0.22)';
-            ctx.globalCompositeOperation = 'overlay';
-            ctx.fillRect(0, 0, HD_SIZE, HD_SIZE);
-            ctx.globalCompositeOperation = 'source-over';
-          }
-
-          this.blockTiles.set(stratum.id, c);
-          if (sIdx === 4) {
-            this.coreTiles.set(planet.id, c);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Using procedural fallback sprites:', err);
+  /** Builds the neon art set: rock per stratum, ores, pods, pickups, cores and drones. */
+  private generateNeonArt(): void {
+    for (const planet of PLANETS) {
+      for (const stratum of planet.strata) this.blockTiles.set(stratum.id, neonRockTile(stratum.id));
+      this.coreTiles.set(planet.id, neonCore(planet.coreGlowColor));
     }
+    for (const ore of Object.values(ORES)) this.oreOverlays.set(ore.id, neonOre(ore));
+    for (let tier = 1; tier <= 3; tier++) {
+      this.podSprites.set(tier, neonPod(tier));
+      this.droneSprites.set(tier, neonDrone(tier));
+    }
+    this.fuelCellTile = neonFuelCell();
+    this.beaconTile = neonBeacon();
+    this.relicChestTile = neonRelic();
   }
 
   private drawRoundedRect(
@@ -175,17 +101,6 @@ export class SpriteAtlas {
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
-  }
-
-  private generateBlockTilesFallback(): void {
-    for (const planet of PLANETS) {
-      for (const stratum of planet.strata) {
-        const [c, ctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
-        ctx.fillStyle = stratum.palette.base;
-        ctx.fillRect(0, 0, HD_SIZE, HD_SIZE);
-        this.blockTiles.set(stratum.id, c);
-      }
-    }
   }
 
   /**
@@ -212,7 +127,7 @@ export class SpriteAtlas {
           pts.push({ x: cx, y: cy });
         }
 
-        ctx.strokeStyle = 'rgba(236, 239, 241, 0.42)';
+        ctx.strokeStyle = 'rgba(160, 250, 255, 0.5)';
         ctx.lineWidth = 6.5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -226,130 +141,6 @@ export class SpriteAtlas {
         ctx.stroke();
       }
       this.crackTiles.push(c);
-    }
-  }
-
-  private generateOreOverlaysFallback(): void {
-    for (const ore of Object.values(ORES)) {
-      const [c, ctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
-      ctx.fillStyle = ore.color;
-      ctx.beginPath();
-      ctx.arc(64, 64, 34, 0, Math.PI * 2);
-      ctx.fill();
-      this.oreOverlays.set(ore.id, c);
-    }
-  }
-
-  private generateSpecialTiles(): void {
-    // 1. Fuel Cell Fallback
-    const [fc, fctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
-    fctx.fillStyle = '#00e676';
-    this.drawRoundedRect(fctx, 36, 20, 56, 88, 14);
-    fctx.fill();
-    this.fuelCellTile = fc;
-
-    // 2. Cyan Extraction Beacon Pylon (Page 6: cyan pylon embedded in rock)
-    const [bc, bctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
-    bctx.fillStyle = '#102436';
-    this.drawRoundedRect(bctx, 34, 88, 60, 24, 6);
-    bctx.fill();
-    bctx.strokeStyle = '#070a12';
-    bctx.lineWidth = 4;
-    bctx.stroke();
-
-    bctx.fillStyle = '#00e5ff';
-    bctx.beginPath();
-    bctx.moveTo(64, 16);
-    bctx.lineTo(88, 52);
-    bctx.lineTo(76, 88);
-    bctx.lineTo(52, 88);
-    bctx.lineTo(40, 52);
-    bctx.closePath();
-    bctx.fill();
-    bctx.stroke();
-
-    bctx.fillStyle = '#e0f7fa';
-    bctx.beginPath();
-    bctx.moveTo(64, 24);
-    bctx.lineTo(76, 50);
-    bctx.lineTo(64, 78);
-    bctx.lineTo(54, 50);
-    bctx.closePath();
-    bctx.fill();
-    this.beaconTile = bc;
-
-    // 3. Relic Chest Pickup (Page 7: 96x96 gold/steel chest)
-    const [rc, rctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
-    this.drawRoundedRect(rctx, 22, 34, 84, 64, 10);
-    rctx.fillStyle = '#f5a623';
-    rctx.fill();
-    rctx.lineWidth = 4;
-    rctx.strokeStyle = '#1c1204';
-    rctx.stroke();
-    rctx.fillStyle = '#263238';
-    rctx.fillRect(24, 58, 80, 10);
-    rctx.fillStyle = '#00e5ff';
-    rctx.beginPath();
-    rctx.arc(64, 63, 9, 0, Math.PI * 2);
-    rctx.fill();
-    this.relicChestTile = rc;
-
-    for (const pid of [1, 2, 3]) {
-      const [cc, cctx] = this.createHDCanvas(HD_SIZE, HD_SIZE);
-      cctx.fillStyle = pid === 1 ? '#ff5722' : pid === 2 ? '#00e5ff' : '#d500f9';
-      cctx.fillRect(0, 0, HD_SIZE, HD_SIZE);
-      this.coreTiles.set(pid, cc);
-    }
-
-    this.generateDroneSprites();
-  }
-
-  /** Mining drones per tier (1..3): outlined hull, rotor arms and a lens tinted to match the pod's thruster colour. */
-  private generateDroneSprites(): void {
-    const lensColors = ['#ff9100', '#00e5ff', '#ff4081'];
-    for (let tier = 1; tier <= 3; tier++) {
-      const [c, ctx] = this.createHDCanvas(64, 64);
-      ctx.translate(32, 32);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#140c1c';
-
-      // Rotor arms and pads
-      ctx.fillStyle = '#546e7a';
-      for (const dir of [-1, 1]) {
-        ctx.fillRect(dir > 0 ? 8 : -24, -3, 16, 6);
-        ctx.strokeRect(dir > 0 ? 8 : -24, -3, 16, 6);
-        ctx.beginPath();
-        ctx.ellipse(dir * 22, -6, 9, 3, 0, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(207, 216, 220, 0.75)';
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#546e7a';
-      }
-
-      // Hull: safety yellow, heavier plating per tier
-      ctx.fillStyle = tier === 3 ? '#ffb300' : '#ffd54f';
-      ctx.beginPath();
-      ctx.arc(0, 0, 12 + tier, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      if (tier >= 2) {
-        ctx.fillStyle = '#37474f';
-        ctx.fillRect(-10 - tier, 4, 20 + tier * 2, 4);
-      }
-
-      // Lens
-      ctx.fillStyle = lensColors[tier - 1];
-      ctx.beginPath();
-      ctx.arc(0, -1, 5.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(-1.8, -3, 1.6, 0, Math.PI * 2);
-      ctx.fill();
-
-      this.droneSprites.set(tier, c);
     }
   }
 
@@ -636,8 +427,8 @@ export class SpriteAtlas {
 
     // 1. Volumetric Forward Headlight Cone
     const lightGrad = ctx.createRadialGradient(0, 18, 6, 0, 75, 98);
-    lightGrad.addColorStop(0, 'rgba(255, 248, 200, 0.24)');
-    lightGrad.addColorStop(0.55, 'rgba(0, 229, 255, 0.08)');
+    lightGrad.addColorStop(0, 'rgba(160, 250, 255, 0.22)');
+    lightGrad.addColorStop(0.55, 'rgba(255, 46, 136, 0.07)');
     lightGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = lightGrad;
     ctx.beginPath();
@@ -810,109 +601,6 @@ export class SpriteAtlas {
       // Left exposed edge
       ctx.fillRect(sx, sy, rim, TILE_SIZE);
     }
-    ctx.restore();
-  }
-
-  /**
-   * Renders the Planet Surface Scene (Page 10: sky, moon/aurora/eclipsed sun, mesas/spires/volcanoes, derrick & pad)
-   */
-  public drawSurfaceScene(
-    ctx: CanvasRenderingContext2D,
-    planet: PlanetConfig,
-    w: number,
-    groundY: number,
-    padScreenX: number,
-    animTime: number
-  ): void {
-    if (groundY <= 0) return;
-    ctx.save();
-
-    // 1. Sky Gradient
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
-    skyGrad.addColorStop(0, planet.skyColorTop);
-    skyGrad.addColorStop(1, planet.skyColorBottom);
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, w, groundY);
-
-    // 2. Celestial Body per Planet (Page 10)
-    if (planet.id === 1) {
-      // Terra-Vein: Large dusty moon + mesas
-      ctx.fillStyle = 'rgba(255, 213, 140, 0.22)';
-      ctx.beginPath();
-      ctx.arc(w * 0.76, groundY * 0.36, 48, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Distant silhouette mesas
-      ctx.fillStyle = '#26140e';
-      ctx.beginPath();
-      ctx.moveTo(0, groundY);
-      ctx.lineTo(0, groundY - 38);
-      ctx.lineTo(w * 0.18, groundY - 38);
-      ctx.lineTo(w * 0.24, groundY - 14);
-      ctx.lineTo(w * 0.68, groundY - 14);
-      ctx.lineTo(w * 0.74, groundY - 46);
-      ctx.lineTo(w * 0.9, groundY - 46);
-      ctx.lineTo(w, groundY - 20);
-      ctx.lineTo(w, groundY);
-      ctx.closePath();
-      ctx.fill();
-    } else if (planet.id === 2) {
-      // Cryo-Vex: Glowing Aurora & Ice Spires
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.28)';
-      ctx.lineWidth = 14;
-      ctx.beginPath();
-      for (let x = 0; x <= w; x += 40) {
-        const y = groundY * 0.32 + Math.sin(x * 0.012 + animTime * 1.4) * 16;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      ctx.fillStyle = '#09223b';
-      ctx.beginPath();
-      ctx.moveTo(0, groundY);
-      for (let x = 0; x <= w; x += 65) {
-        const peak = (x % 130 === 0 ? 52 : 24);
-        ctx.lineTo(x, groundY - peak);
-      }
-      ctx.lineTo(w, groundY);
-      ctx.closePath();
-      ctx.fill();
-    } else {
-      // Pyra-Void: Eclipsed Black-Hole Sun & Volcanoes
-      const sunX = w * 0.75;
-      const sunY = groundY * 0.36;
-      const corona = ctx.createRadialGradient(sunX, sunY, 18, sunX, sunY, 56);
-      corona.addColorStop(0, '#ff4081');
-      corona.addColorStop(0.5, 'rgba(224, 64, 251, 0.35)');
-      corona.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = corona;
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, 56, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#07020d';
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, 22, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // 3. Mining Derrick Tower & Landing Pad around padScreenX
-    ctx.strokeStyle = '#37474f';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(padScreenX - 65, groundY);
-    ctx.lineTo(padScreenX - 42, groundY - 82);
-    ctx.lineTo(padScreenX + 42, groundY - 82);
-    ctx.lineTo(padScreenX + 65, groundY);
-    ctx.stroke();
-
-    // Landing Pad Gantry Collar
-    ctx.fillStyle = '#1c2632';
-    ctx.fillRect(padScreenX - 82, groundY - 10, 164, 12);
-    ctx.fillStyle = planet.accentColor;
-    ctx.fillRect(padScreenX - 76, groundY - 6, 152, 4);
-
     ctx.restore();
   }
 

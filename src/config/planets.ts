@@ -50,10 +50,10 @@ export const PLANETS: PlanetConfig[] = [
     coreName: 'Terra-Vein Iron Core',
     coreTileHp: 220,
     coreRewardCash: 2500,
-    skyColorTop: '#1a1118',
-    skyColorBottom: '#3d231a',
-    accentColor: '#f5a623',
-    coreGlowColor: '#ff6d00',
+    skyColorTop: '#07021a',
+    skyColorBottom: '#2a0b4a',
+    accentColor: '#ff2e88',
+    coreGlowColor: '#ffb000',
     strata: [
       {
         id: 'p1_loam',
@@ -166,7 +166,7 @@ export const PLANETS: PlanetConfig[] = [
     coreRewardCash: 65000,
     skyColorTop: '#07162c',
     skyColorBottom: '#10375c',
-    accentColor: '#00e5ff',
+    accentColor: '#00f0ff',
     coreGlowColor: '#00b0ff',
     strata: [
       {
@@ -280,7 +280,7 @@ export const PLANETS: PlanetConfig[] = [
     coreRewardCash: 2500000,
     skyColorTop: '#12041c',
     skyColorBottom: '#310a38',
-    accentColor: '#e040fb',
+    accentColor: '#b967ff',
     coreGlowColor: '#ff4081',
     strata: [
       {

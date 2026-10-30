@@ -1,3 +1,4 @@
+import { mix, neonStratum } from '../assets/neonArt';
 import { ORES } from '../config/ores';
 import { GameContext } from '../core/GameContext';
 import { DiveInput } from '../core/Input';
@@ -111,7 +112,7 @@ export class DiveScreen {
     // Hard-edged bands, one per stratum, so the gauge reads like a core sample
     const n = planet.strata.length;
     const stops = planet.strata
-      .map((s, idx) => `${s.palette.base} ${(idx / n) * 100}% ${((idx + 1) / n) * 100}%`)
+      .map((s, idx) => `${mix(neonStratum(s.id).glow, '#07021a', 0.45)} ${(idx / n) * 100}% ${((idx + 1) / n) * 100}%`)
       .join(', ');
     $('depth-meter-track').style.background = `linear-gradient(180deg, ${stops})`;
 

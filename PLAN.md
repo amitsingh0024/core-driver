@@ -82,3 +82,10 @@ Reference: Coal LLC, with its readable side-on mine and a company yard on top.
 - **Ore in pockets:** ore chance is scaled by smooth value noise (mean of about 1), so ore forms clusters. Ore share is about 24% of tiles. Ore and pickups draw at about 75% size with a small offset and a contact shadow, so they sit in the rock.
 - **Lighting:** daylight fades over the first 14 rows into darkness that deepens each stratum. The pod lamp and forward beam cut it open, with a warm tint. Fuel cells, relics, beacons and the core glow through the dark. Dust drifts in the lamp light.
 - **Readability:** ore popups are now just "+$value" (plus "2× ORE"), armored veins use riveted steel bands, and the surface drill prompt sits on a pill. On short landscape phones the controls bar hides and the tips take over.
+
+## 6. Art Direction: Neon Grid (Oct 2026)
+The painted "company issue" look is replaced by a synthwave neon style, all drawn in code (no sprite sheets).
+- **Art set** lives in `assets/neonArt.ts`: low-poly dark rock per stratum (`NEON_STRATA` holds each stratum's face and glow colour), glowing crystal and nugget ores, outlined pods per tier (cyan, hot pink, violet), and neon fuel cells, beacons, relics, cores and drones.
+- **Dive view:** rock edges that face a tunnel glow in the stratum colour, and ores get a soft halo. Both are drawn after the darkness pass (`DiveRenderer.drawNeonPass`) so they read at any depth.
+- **Surface** (`render/SurfaceBase.ts`): night sky with stars, a striped retro sun, wireframe mountains, and a neon outpost (HQ tower, fuel station, derrick, refinery, hangar).
+- **UI:** `neon.css` loads after `theme.css`, re-points its tokens at the neon palette and swaps rivets, hazard stripes and paper slips for glass panels with glowing edges. Fonts are Orbitron (display), Rajdhani (body) and Share Tech Mono (readouts).
