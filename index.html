@@ -5,22 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Core Diver — Planetary Mining Incremental</title>
     <meta name="description" content="Steer a drill rig through layered planets, haul rare ore before your fuel runs dry, and shatter each planet's core." />
-    <meta name="theme-color" content="#121416" />
+    <meta name="theme-color" content="#07021a" />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23121416'/%3E%3Cpath d='M18 14h28v18L32 52 18 32z' fill='%23f6b916'/%3E%3Ccircle cx='32' cy='26' r='6' fill='%234fd8f0'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307021a'/%3E%3Cpath d='M18 14h28v18L32 52 18 32z' fill='none' stroke='%23ff2e88' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='26' r='6' fill='%2300f0ff'/%3E%3C/svg%3E"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap"
       rel="stylesheet"
     />
-    <link rel="preload" as="image" href="./sprites/strata_rocks_hd.webp" type="image/webp" crossorigin="anonymous" />
-    <link rel="preload" as="image" href="./sprites/drill_pods_hd.webp" type="image/webp" crossorigin="anonymous" />
-    <link rel="preload" as="image" href="./sprites/ores_gems_hd.webp" type="image/webp" crossorigin="anonymous" />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/theme.css" />
+    <link rel="stylesheet" href="/src/neon.css" />
   </head>
   <body>
     <div id="app" style="--planet-accent: #f5a623">
@@ -29,7 +27,7 @@
         <div class="boot-inner">
           <div id="boot-logo-slot" class="boot-logo-slot"></div>
           <div class="boot-bar"><div class="boot-fill" id="boot-fill"></div></div>
-          <div class="boot-status tabular" id="boot-status">CALIBRATING DRILL ARRAY…</div>
+          <div class="boot-status tabular" id="boot-status">SYNCING NEON GRID…</div>
           <div class="boot-prompt" id="boot-prompt">CLICK OR PRESS ANY KEY</div>
         </div>
       </div>
@@ -71,7 +69,7 @@
             </div>
             <div class="title-footer">
               <span>MANUAL THRUST STEERING • 0 FUEL BURN WHEN IDLE</span>
-              <span>v2.4.0 • DEEP EXCAVATION CORP</span>
+              <span>v2.5.0 • DEEP-GRID MINING SYNDICATE</span>
             </div>
           </div>
         </div>
@@ -245,8 +243,8 @@
             <!-- Assay receipt: header, stamps, sold ore and the total -->
             <div class="results-receipt">
             <div class="receipt-head">
-              <strong>CORE DIVER CO.</strong>
-              <span>ASSAY &amp; WEIGH STATION</span>
+              <strong>DEEP-GRID SYNDICATE</strong>
+              <span>ORE UPLINK</span>
             </div>
             <div class="results-header">
               <div>

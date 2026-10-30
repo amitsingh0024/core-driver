@@ -1,0 +1,541 @@
+/* ==========================================================================
+   CORE DIVER — "Neon Grid" UI theme
+   Loaded after theme.css. Re-points the theme's tokens at a synthwave palette
+   (night-purple glass, hot-pink and cyan neon, mono LCD digits) and replaces the
+   steel-plate kit pieces (rivets, hazard stripes, paper slips) with glowing outlines,
+   so the interface matches the neon art drawn on the canvases.
+   ========================================================================== */
+
+:root {
+  --font-display: 'Orbitron', 'Rajdhani', sans-serif;
+  --font-num: 'Share Tech Mono', 'Rajdhani', monospace;
+  --font-body: 'Rajdhani', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-label: 'Rajdhani', sans-serif;
+
+  --neon-pink: #ff2e88;
+  --neon-pink-hi: #ff7ab8;
+  --neon-cyan: #00f0ff;
+  --neon-violet: #b967ff;
+  --neon-gold: #ffd23f;
+  --neon-green: #39ff88;
+  --glass: rgba(16, 8, 38, 0.78);
+  --glass-hi: rgba(42, 18, 84, 0.82);
+  --glass-line: rgba(0, 240, 255, 0.38);
+
+  --outline: #3a2a6e;
+  --steel-hi: #2a1a52;
+  --steel: #1a0f38;
+  --steel-lo: #110a28;
+  --steel-dark: #0b0620;
+  --paint: var(--neon-pink);
+  --paint-hi: var(--neon-pink-hi);
+  --paint-lo: #8a0f4a;
+  --safety-green: var(--neon-green);
+  --safety-green-lo: #0d7a3e;
+  --signal-red: #ff3864;
+  --signal-red-lo: #7a0f2a;
+  --cream: #efe6ff;
+  --cream-dim: #a99cc9;
+  --paper: rgba(20, 10, 44, 0.92);
+  --paper-lo: rgba(58, 42, 110, 0.6);
+  --ink: #efe6ff;
+  --ink-red: var(--neon-pink);
+  --lcd-bg: #05020f;
+  --lcd-amber: var(--neon-cyan);
+  --lcd-green: var(--neon-green);
+
+  --text-main: var(--cream);
+  --text-dim: var(--cream-dim);
+  --accent-amber: var(--neon-pink);
+  --bg-dark: #07021a;
+
+  --rivet: none;
+  --rivets: linear-gradient(transparent, transparent);
+  --brushed: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px);
+  --steel-face: linear-gradient(180deg, var(--glass-hi) 0%, var(--glass) 100%);
+  --plate-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 0 14px rgba(0, 240, 255, 0.16),
+    0 10px 24px rgba(0, 0, 0, 0.5);
+  --diamond-plate:
+    linear-gradient(rgba(185, 103, 255, 0.08) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, rgba(185, 103, 255, 0.08) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+
+html,
+body,
+#app {
+  background: var(--bg-dark);
+  color: var(--cream);
+}
+
+/* --------------------------------------------------------------------------
+   Kit: glass panels with neon edges
+   -------------------------------------------------------------------------- */
+.steel-panel,
+.steel-chip {
+  background: var(--brushed), var(--steel-face);
+  border: 1.5px solid var(--glass-line);
+  border-radius: 10px;
+  box-shadow: var(--plate-shadow);
+  backdrop-filter: blur(6px);
+}
+
+.steel-chip {
+  border-radius: 8px;
+}
+
+.hazard-stripe-bar {
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--neon-pink) 15%, var(--neon-cyan) 85%, transparent);
+  border: 0;
+  box-shadow: 0 0 10px var(--neon-pink), 0 0 18px rgba(0, 240, 255, 0.4);
+}
+
+.lcd,
+.depth-counter,
+.fuel-numbers,
+.pill-value,
+.cash-value-row,
+.telemetry-val {
+  background: var(--lcd-bg);
+  border: 1px solid rgba(0, 240, 255, 0.28);
+  border-radius: 4px;
+  box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.12);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.75);
+  font-family: var(--font-num);
+  font-weight: 400;
+}
+
+.depth-counter {
+  background: var(--lcd-bg);
+}
+
+.depth-counter small {
+  color: var(--neon-pink);
+}
+
+/* Buttons: outlined neon tubes that fill on hover */
+.btn-primary {
+  border: 2px solid currentColor;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.btn-amber,
+.btn-green {
+  background: linear-gradient(180deg, rgba(255, 46, 136, 0.28), rgba(255, 46, 136, 0.1));
+  color: #ffe3f0;
+  border-color: var(--neon-pink);
+  text-shadow: 0 0 8px var(--neon-pink);
+  box-shadow: 0 0 16px rgba(255, 46, 136, 0.55), inset 0 0 14px rgba(255, 46, 136, 0.35);
+}
+
+.btn-green {
+  background: linear-gradient(180deg, rgba(57, 255, 136, 0.24), rgba(57, 255, 136, 0.08));
+  color: #e6fff0;
+  border-color: var(--neon-green);
+  text-shadow: 0 0 8px var(--neon-green);
+  box-shadow: 0 0 16px rgba(57, 255, 136, 0.45), inset 0 0 14px rgba(57, 255, 136, 0.3);
+}
+
+.btn-amber:hover:not(:disabled),
+.btn-green:hover:not(:disabled) {
+  filter: brightness(1.25);
+}
+
+.btn-amber:active:not(:disabled),
+.btn-green:active:not(:disabled) {
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+}
+
+.btn-primary:disabled {
+  filter: grayscale(0.8) brightness(0.7);
+  box-shadow: none;
+}
+
+.btn-secondary,
+.mini-btn,
+.hud-icon-btn {
+  color: var(--cream);
+  background: rgba(16, 8, 38, 0.75);
+  border: 1.5px solid rgba(0, 240, 255, 0.4);
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
+  text-shadow: none;
+}
+
+.btn-secondary,
+.mini-btn {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.btn-secondary:hover,
+.mini-btn:hover,
+.hud-icon-btn:hover {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.45);
+  filter: none;
+}
+
+.btn-secondary:active,
+.mini-btn:active {
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.4);
+}
+
+.hud-icon-btn .btn-icon svg * {
+  stroke: var(--neon-cyan);
+}
+
+button:focus-visible,
+input[type='range']:focus-visible {
+  outline: 2px solid var(--neon-cyan);
+}
+
+/* --------------------------------------------------------------------------
+   Dive HUD
+   -------------------------------------------------------------------------- */
+.planet-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-shadow: none;
+}
+
+.planet-dot {
+  border: 0;
+  box-shadow: 0 0 8px currentColor !important;
+}
+
+.stratum-title {
+  color: var(--neon-pink);
+  text-shadow: 0 0 6px rgba(255, 46, 136, 0.6);
+}
+
+.fuel-title,
+.pill-label,
+.depth-meter-title {
+  font-family: var(--font-display);
+  letter-spacing: 0.14em;
+  color: var(--cream);
+}
+
+.fuel-bar-track {
+  background: #05020f;
+  border: 1px solid rgba(57, 255, 136, 0.35);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.fuel-bar-fill {
+  background: linear-gradient(90deg, #0fd46a, var(--neon-green));
+  box-shadow: 0 0 12px rgba(57, 255, 136, 0.7);
+}
+
+.fuel-bar-wrapper.warn-fuel .fuel-bar-fill {
+  background: linear-gradient(90deg, #ff9f1c, var(--neon-gold));
+  box-shadow: 0 0 12px rgba(255, 210, 63, 0.7);
+}
+
+.fuel-bar-wrapper.low-fuel .fuel-bar-fill {
+  background: linear-gradient(90deg, #c4123f, var(--signal-red));
+  box-shadow: 0 0 12px rgba(255, 56, 100, 0.8);
+}
+
+.hud-contract {
+  background: rgba(5, 2, 15, 0.7);
+  border: 1px solid rgba(255, 46, 136, 0.35);
+  color: var(--cream);
+  box-shadow: none;
+}
+
+.hud-contract .contract-tag {
+  background: transparent;
+  color: var(--neon-pink);
+  border: 1px solid var(--neon-pink);
+  box-shadow: 0 0 8px rgba(255, 46, 136, 0.5);
+  transform: none;
+}
+
+.hud-contract .contract-progress {
+  color: var(--cream-dim);
+}
+
+.hud-contract .contract-reward {
+  color: var(--neon-green);
+  text-shadow: 0 0 6px rgba(57, 255, 136, 0.6);
+}
+
+.hud-contract .contract-fill {
+  background: var(--neon-pink);
+  box-shadow: 0 0 8px var(--neon-pink);
+}
+
+.depth-meter-track {
+  border: 1px solid rgba(0, 240, 255, 0.3);
+}
+
+.controls-hint {
+  font-family: var(--font-label);
+}
+
+.controls-hint strong {
+  color: var(--neon-cyan);
+  font-family: var(--font-display);
+  font-size: 0.85em;
+  letter-spacing: 0.08em;
+}
+
+/* Winch button: a neon ring instead of the hazard-striped dial */
+.extract-circle-btn {
+  background: radial-gradient(circle, rgba(255, 46, 136, 0.35) 0 52%, rgba(16, 8, 38, 0.9) 54%) !important;
+  border: 2px solid var(--neon-pink) !important;
+  box-shadow: 0 0 22px rgba(255, 46, 136, 0.6), inset 0 0 18px rgba(255, 46, 136, 0.4) !important;
+}
+
+.extract-circle-btn::before,
+.extract-circle-btn::after {
+  background: none !important;
+  border-color: rgba(255, 46, 136, 0.5) !important;
+}
+
+.extract-text,
+.extract-sub {
+  font-family: var(--font-display);
+  color: #ffe3f0;
+  text-shadow: 0 0 8px var(--neon-pink);
+}
+
+.extract-icon svg * {
+  stroke: #ffe3f0;
+}
+
+.extract-radial-fg {
+  stroke: var(--neon-cyan);
+  filter: drop-shadow(0 0 6px var(--neon-cyan));
+}
+
+#btn-hold-extract.beacon-charged {
+  border-color: var(--neon-cyan) !important;
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.85), inset 0 0 18px rgba(0, 240, 255, 0.4) !important;
+}
+
+/* Foreman tips and toasts: holo comms instead of paper slips */
+.coach-tip {
+  background: rgba(10, 4, 28, 0.88);
+  border: 1px solid rgba(0, 240, 255, 0.45);
+  color: var(--cream);
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.25);
+  transform: none;
+}
+
+.coach-tag {
+  background: transparent;
+  color: var(--neon-cyan);
+  border: 1px solid var(--neon-cyan);
+  font-family: var(--font-display);
+  letter-spacing: 0.12em;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+}
+
+.coach-tip.urgent {
+  border-color: var(--neon-pink);
+  box-shadow: 0 0 18px rgba(255, 46, 136, 0.45);
+}
+
+.coach-tip.urgent .coach-tag {
+  color: var(--neon-pink);
+  border-color: var(--neon-pink);
+}
+
+.stratum-banner-title,
+.dive-toast-title,
+.results-main-title,
+.core-cutscene-title {
+  font-family: var(--font-display);
+  text-shadow: 0 0 12px currentColor;
+}
+
+/* --------------------------------------------------------------------------
+   Title, boot splash, results
+   -------------------------------------------------------------------------- */
+.title-card,
+.results-card,
+.pause-modal-card,
+.inspector-card {
+  border-color: rgba(255, 46, 136, 0.55);
+  box-shadow: 0 0 28px rgba(255, 46, 136, 0.28), 0 0 60px rgba(0, 240, 255, 0.12), 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+
+.title-tagline,
+.title-footer {
+  color: var(--cream-dim);
+  font-family: var(--font-label);
+  letter-spacing: 0.14em;
+}
+
+.boot-splash {
+  background: radial-gradient(ellipse at 50% 120%, rgba(255, 46, 136, 0.35), transparent 60%), #07021a;
+}
+
+.boot-bar {
+  background: #05020f;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+}
+
+.boot-fill {
+  background: linear-gradient(90deg, var(--neon-pink), var(--neon-cyan));
+  box-shadow: 0 0 12px var(--neon-pink);
+}
+
+.boot-status,
+.boot-prompt {
+  color: var(--neon-cyan);
+  font-family: var(--font-num);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+}
+
+.results-receipt,
+.results-manifest-box {
+  background: rgba(5, 2, 15, 0.6);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: var(--cream);
+  box-shadow: none;
+}
+
+.stamp-badge,
+.stamp-badge.gold,
+.stamp-badge.red,
+.stamp-badge.cyan,
+.stamp-badge.green {
+  background: transparent;
+  font-family: var(--font-display);
+  letter-spacing: 0.1em;
+  border-width: 1.5px;
+  transform: none;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.stamp-badge.gold {
+  color: var(--neon-gold);
+  border-color: var(--neon-gold);
+}
+
+.stamp-badge.red {
+  color: var(--neon-pink);
+  border-color: var(--neon-pink);
+}
+
+.stamp-badge.cyan {
+  color: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+}
+
+.stamp-badge.green {
+  color: var(--neon-green);
+  border-color: var(--neon-green);
+}
+
+.results-total-amount {
+  color: var(--neon-green);
+  font-family: var(--font-num);
+  text-shadow: 0 0 12px rgba(57, 255, 136, 0.7);
+}
+
+/* --------------------------------------------------------------------------
+   Hangar
+   -------------------------------------------------------------------------- */
+#hangar-screen {
+  background: radial-gradient(ellipse at 50% 0%, rgba(185, 103, 255, 0.18), transparent 60%), var(--diamond-plate),
+    #07021a;
+}
+
+.hangar-nav-btn {
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--cream-dim);
+}
+
+.hangar-nav-btn.active {
+  color: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+  background: rgba(0, 240, 255, 0.1);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.4);
+}
+
+.inspector-title,
+.slot-card-title,
+.codex-planet-title,
+.planet-card-title,
+.garage-bay-header h2,
+.planet-map-header h2,
+.codex-top-bar h2,
+.modal-header h2,
+.settings-card h2 {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+}
+
+.level-pip.filled {
+  background: var(--neon-cyan);
+  box-shadow: 0 0 6px var(--neon-cyan);
+}
+
+.toggle-btn.on {
+  background: rgba(57, 255, 136, 0.2);
+  border-color: var(--neon-green);
+  color: var(--neon-green);
+  box-shadow: 0 0 10px rgba(57, 255, 136, 0.5);
+}
+
+.hangar-nav-rail {
+  background: rgba(10, 4, 28, 0.9);
+  border-right: 1px solid rgba(255, 46, 136, 0.4);
+  box-shadow: 4px 0 18px rgba(255, 46, 136, 0.12);
+}
+
+.hangar-nav-btn {
+  background: rgba(16, 8, 38, 0.7);
+  border: 1.5px solid rgba(185, 103, 255, 0.35);
+}
+
+.garage-canvas-wrap {
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  background: radial-gradient(circle at 50% 45%, rgba(255, 46, 136, 0.22) 0%, transparent 55%), var(--diamond-plate),
+    linear-gradient(180deg, #120a2a 0%, #07021a 100%);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.hangar-header::after {
+  height: 2px;
+  background: linear-gradient(90deg, var(--neon-pink), var(--neon-violet), var(--neon-cyan));
+  border: 0;
+  box-shadow: 0 0 10px var(--neon-pink);
+}
+
+.results-backdrop {
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 46, 136, 0.25), transparent 60%), var(--diamond-plate),
+    rgba(7, 2, 26, 0.94);
+}
+
+.results-eyebrow,
+.receipt-head,
+.manifest-table-header,
+.results-depth-line,
+.results-mult-note {
+  color: var(--cream-dim);
+}
+
+.results-eyebrow {
+  color: var(--neon-pink);
+}
+
+.manifest-table-header {
+  border-bottom-color: rgba(0, 240, 255, 0.5);
+}

@@ -1,74 +1,85 @@
 import { PlanetConfig } from '../config/planets';
+import { mix, rgba } from '../assets/neonArt';
 
 /**
- * The company yard on the surface: the safe zone every dive starts from.
- * Sky, drifting clouds, two parallax hill bands, then the base itself laid out
- * around the drill pad: office, fuel pump, derrick, ore depot with conveyor, garage,
- * plus trees, lamps and a few workers walking between buildings.
+ * The outpost on the surface: the safe zone every dive starts from, drawn as a synthwave night.
+ * Gradient sky with stars, a striped retro sun, two parallax bands of wireframe mountains, then
+ * the outpost around the drill pad: HQ tower, fuel station, neon derrick, ore refinery, hangar,
+ * light poles, and a few drones drifting between buildings.
  *
  * Everything is drawn in screen space. `padX` is the screen x of the pad centre and
- * `groundY` the screen y of ground level, so the yard scrolls with the dive camera.
+ * `groundY` the screen y of ground level, so the outpost scrolls with the dive camera.
  */
 
 interface SurfaceTheme {
   skyTop: string;
-  skyBottom: string;
-  grass: string;
-  grassDark: string;
-  hillNear: string;
-  hillFar: string;
-  cloud: string;
-  foliage: string;
-  foliageDark: string;
-  trunk: string;
+  skyMid: string;
+  horizon: string;
+  sunTop: string;
+  sunBottom: string;
+  mountain: string;
+  ridge: string; // mountain wireframe colour
+  ground: string; // neon line along the ground
+  sign: string; // second neon colour for signs and windows
 }
 
 const THEMES: Record<number, SurfaceTheme> = {
   1: {
-    skyTop: '#5fa8e0',
-    skyBottom: '#d6ecf3',
-    grass: '#6cbf3f',
-    grassDark: '#3f8a2a',
-    hillNear: '#4d6b34',
-    hillFar: '#7a6a52',
-    cloud: 'rgba(255, 244, 230, 0.85)',
-    foliage: '#4f9a35',
-    foliageDark: '#2f6a24',
-    trunk: '#5b3a22',
+    skyTop: '#07021a',
+    skyMid: '#2a0b4a',
+    horizon: '#ff3d7f',
+    sunTop: '#ffd23f',
+    sunBottom: '#ff2e88',
+    mountain: '#12062a',
+    ridge: '#ff4fd8',
+    ground: '#ff2e88',
+    sign: '#00f0ff',
   },
   2: {
-    skyTop: '#7fb2d9',
-    skyBottom: '#eef8ff',
-    grass: '#e6f4fb',
-    grassDark: '#a9cfe2',
-    hillNear: '#6d8fae',
-    hillFar: '#9db6cc',
-    cloud: 'rgba(235, 248, 255, 0.8)',
-    foliage: '#3f6f73',
-    foliageDark: '#28494d',
-    trunk: '#4a3a33',
+    skyTop: '#010818',
+    skyMid: '#06204a',
+    horizon: '#2ee6ff',
+    sunTop: '#e6ffff',
+    sunBottom: '#2b8cff',
+    mountain: '#04112b',
+    ridge: '#4dd9ff',
+    ground: '#00f0ff',
+    sign: '#ff6ad5',
   },
   3: {
-    skyTop: '#240c33',
-    skyBottom: '#8a2f5c',
-    grass: '#5a3f5e',
-    grassDark: '#36223a',
-    hillNear: '#2c1830',
-    hillFar: '#4a2142',
-    cloud: 'rgba(255, 150, 190, 0.35)',
-    foliage: '#7a2f4f',
-    foliageDark: '#4d1a33',
-    trunk: '#2a1a22',
+    skyTop: '#050010',
+    skyMid: '#26063d',
+    horizon: '#b967ff',
+    sunTop: '#ff66ff',
+    sunBottom: '#5b0fbf',
+    mountain: '#0d0420',
+    ridge: '#00ffc8',
+    ground: '#b967ff',
+    sign: '#00ffc8',
   },
 };
-
-const OUTLINE = '#15110d';
 
 export function surfaceTheme(planetId: number): SurfaceTheme {
   return THEMES[planetId] ?? THEMES[1];
 }
 
-/** Sky, sun or moon, clouds and hills. Fills from the top of the screen down to `groundY`. */
+/** Neon stroke: a wide faint pass under a thin bright one, cheaper than shadowBlur every frame. */
+function neonStroke(ctx: CanvasRenderingContext2D, path: Path2D, color: string, width = 2.5): void {
+  ctx.strokeStyle = rgba(color, 0.22);
+  ctx.lineWidth = width * 3.2;
+  ctx.stroke(path);
+  ctx.strokeStyle = mix(color, '#ffffff', 0.25);
+  ctx.lineWidth = width;
+  ctx.stroke(path);
+}
+
+function rectPath(x: number, y: number, w: number, h: number): Path2D {
+  const p = new Path2D();
+  p.rect(x, y, w, h);
+  return p;
+}
+
+/** Sky, stars, sun and mountains. Fills from the top of the screen down to `groundY`. */
 export function drawSurfaceSky(
   ctx: CanvasRenderingContext2D,
   planet: PlanetConfig,
@@ -81,77 +92,100 @@ export function drawSurfaceSky(
   const theme = surfaceTheme(planet.id);
   ctx.save();
 
-  const sky = ctx.createLinearGradient(0, groundY - 520, 0, groundY);
+  const sky = ctx.createLinearGradient(0, groundY - 560, 0, groundY);
   sky.addColorStop(0, theme.skyTop);
-  sky.addColorStop(1, theme.skyBottom);
+  sky.addColorStop(0.65, theme.skyMid);
+  sky.addColorStop(1, mix(theme.horizon, theme.skyMid, 0.35));
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, w, groundY);
 
-  // Sun / moon / eclipsed star, slight parallax
-  const bodyX = w * 0.78 - camX * 0.03;
-  const bodyY = groundY - 300;
-  const glow = ctx.createRadialGradient(bodyX, bodyY, 10, bodyX, bodyY, 120);
-  const glowColor = planet.id === 1 ? '255, 214, 150' : planet.id === 2 ? '200, 240, 255' : '255, 64, 129';
-  glow.addColorStop(0, `rgba(${glowColor}, 0.55)`);
-  glow.addColorStop(1, `rgba(${glowColor}, 0)`);
-  ctx.fillStyle = glow;
-  ctx.fillRect(bodyX - 120, bodyY - 120, 240, 240);
-  ctx.fillStyle = planet.id === 3 ? '#0a0310' : planet.id === 2 ? '#f2fbff' : '#ffe2a8';
-  ctx.beginPath();
-  ctx.arc(bodyX, bodyY, planet.id === 3 ? 26 : 34, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Drifting clouds (wrap across the screen)
-  ctx.fillStyle = theme.cloud;
-  for (let i = 0; i < 6; i++) {
-    const span = w + 400;
-    const x = ((i * 337 + time * (6 + i * 1.5) - camX * 0.08) % span + span) % span - 200;
-    const y = groundY - 380 + ((i * 97) % 170);
-    drawCloud(ctx, x, y, 0.7 + ((i * 53) % 40) / 60);
+  // Stars, twinkling, thinning toward the horizon
+  for (let i = 0; i < 90; i++) {
+    const sx = (((i * 9301 + 49297) % 233280) / 233280) * (w + 200) - ((camX * 0.02) % 200);
+    const sy = groundY - 140 - (((i * 4271 + 1103) % 9973) / 9973) * Math.max(0, groundY - 140);
+    if (sy < 0) continue;
+    const tw = 0.35 + 0.35 * Math.sin(time * (1 + (i % 5) * 0.4) + i);
+    ctx.fillStyle = `rgba(255, 255, 255, ${tw.toFixed(2)})`;
+    ctx.fillRect(sx, sy, i % 7 === 0 ? 2 : 1.2, i % 7 === 0 ? 2 : 1.2);
   }
 
-  // Far hills
-  drawHills(ctx, w, groundY, camX * 0.15, theme.hillFar, 70, 0.0042, 11);
-  // Near hills
-  drawHills(ctx, w, groundY, camX * 0.35, theme.hillNear, 40, 0.0075, 29);
+  // Retro sun: vertical gradient disc cut by horizontal bands that thicken toward the bottom
+  const sunX = w * 0.72 - camX * 0.03;
+  const sunR = 110;
+  const sunY = groundY - 120;
+  const halo = ctx.createRadialGradient(sunX, sunY, sunR * 0.6, sunX, sunY, sunR * 2.2);
+  halo.addColorStop(0, rgba(theme.sunBottom, 0.35));
+  halo.addColorStop(1, rgba(theme.sunBottom, 0));
+  ctx.fillStyle = halo;
+  ctx.fillRect(sunX - sunR * 2.2, sunY - sunR * 2.2, sunR * 4.4, sunR * 4.4);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+  ctx.clip();
+  const sunGrad = ctx.createLinearGradient(0, sunY - sunR, 0, sunY + sunR);
+  sunGrad.addColorStop(0, theme.sunTop);
+  sunGrad.addColorStop(1, theme.sunBottom);
+  ctx.fillStyle = sunGrad;
+  ctx.fillRect(sunX - sunR, sunY - sunR, sunR * 2, sunR * 2);
+  ctx.globalCompositeOperation = 'destination-out';
+  const drift = (time * 6) % 14;
+  for (let k = 0; k < 9; k++) {
+    const y = sunY + 4 + k * 14 + drift;
+    const thick = 1 + k * 0.9;
+    ctx.fillRect(sunX - sunR, y, sunR * 2, thick);
+  }
+  ctx.restore();
+
+  drawMountains(ctx, w, groundY, camX * 0.12, theme, 150, 0.0036, 7, 0.55);
+  drawMountains(ctx, w, groundY, camX * 0.3, theme, 85, 0.0068, 23, 1);
 
   ctx.restore();
 }
 
-function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
-  ctx.beginPath();
-  ctx.ellipse(x, y, 46 * s, 16 * s, 0, 0, Math.PI * 2);
-  ctx.ellipse(x - 26 * s, y + 4 * s, 28 * s, 12 * s, 0, 0, Math.PI * 2);
-  ctx.ellipse(x + 22 * s, y - 8 * s, 30 * s, 16 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawHills(
+/** A mountain band: dark silhouette with a glowing ridge line and faint wireframe struts. */
+function drawMountains(
   ctx: CanvasRenderingContext2D,
   w: number,
   groundY: number,
   offset: number,
-  color: string,
+  theme: SurfaceTheme,
   height: number,
   freq: number,
-  seed: number
+  seed: number,
+  alpha: number
 ): void {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(0, groundY);
-  for (let x = 0; x <= w + 8; x += 8) {
+  const ridge = new Path2D();
+  const pts: Array<[number, number]> = [];
+  for (let x = -24; x <= w + 24; x += 24) {
     const wx = x + offset;
-    const y =
-      groundY -
-      height * (0.55 + 0.3 * Math.sin(wx * freq + seed) + 0.15 * Math.sin(wx * freq * 2.7 + seed * 2));
-    ctx.lineTo(x, y);
+    const n = Math.abs(Math.sin(wx * freq + seed)) * 0.6 + Math.abs(Math.sin(wx * freq * 2.3 + seed * 3)) * 0.4;
+    const y = groundY - height * n;
+    pts.push([x, y]);
+    if (x === -24) ridge.moveTo(x, y);
+    else ridge.lineTo(x, y);
   }
-  ctx.lineTo(w, groundY);
-  ctx.closePath();
-  ctx.fill();
+  const body = new Path2D(ridge);
+  body.lineTo(w + 24, groundY);
+  body.lineTo(-24, groundY);
+  body.closePath();
+  ctx.fillStyle = theme.mountain;
+  ctx.fill(body);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = rgba(theme.ridge, 0.16);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (const [x, y] of pts) {
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + (x % 48 === 0 ? 14 : -14), groundY);
+  }
+  ctx.stroke();
+  neonStroke(ctx, ridge, theme.ridge, 1.6);
+  ctx.restore();
 }
 
-/** Grass (or snow / ash) lip along the top of the ground between two screen x positions. */
+/** Neon edge along the top of the ground between two screen x positions. */
 export function drawGroundLip(
   ctx: CanvasRenderingContext2D,
   planetId: number,
@@ -161,19 +195,14 @@ export function drawGroundLip(
 ): void {
   const theme = surfaceTheme(planetId);
   ctx.save();
-  ctx.fillStyle = theme.grassDark;
-  ctx.fillRect(x0, groundY, x1 - x0, 9);
-  ctx.fillStyle = theme.grass;
-  ctx.fillRect(x0, groundY, x1 - x0, 6);
-  // Tufts hanging over the edge at a stable pseudo-random spacing
-  for (let x = Math.floor(x0 / 7) * 7; x < x1; x += 7) {
-    const h = 3 + (((x * 7919) >>> 0) % 5);
-    ctx.fillRect(x, groundY - h + 2, 3, h);
-  }
+  ctx.fillStyle = rgba(theme.ground, 0.25);
+  ctx.fillRect(x0, groundY - 3, x1 - x0, 9);
+  ctx.fillStyle = mix(theme.ground, '#ffffff', 0.3);
+  ctx.fillRect(x0, groundY, x1 - x0, 2.5);
   ctx.restore();
 }
 
-/** All yard buildings and props. `padX` is the pad centre on screen. */
+/** All outpost buildings and props. `padX` is the pad centre on screen. */
 export function drawSurfaceBase(
   ctx: CanvasRenderingContext2D,
   planet: PlanetConfig,
@@ -186,436 +215,247 @@ export function drawSurfaceBase(
   const accent = planet.accentColor;
   ctx.save();
   ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
 
-  const visible = (x: number, half: number) => x + half > -40 && x - half < w + 40;
+  const visible = (x: number, half: number) => x + half > -60 && x - half < w + 60;
 
-  // Background trees first so buildings overlap them
-  for (const [ox, s] of [
-    [-760, 1.1],
-    [-655, 0.85],
-    [-410, 0.95],
-    [420, 0.9],
-    [700, 1.15],
-    [820, 0.8],
-    [-900, 1],
-    [960, 1],
-  ] as const) {
-    if (visible(padX + ox, 40)) drawTree(ctx, padX + ox, groundY, s, theme);
+  if (visible(padX - 600, 140)) drawHQ(ctx, padX - 600, groundY, theme, accent, time);
+  if (visible(padX - 330, 70)) drawFuelStation(ctx, padX - 330, groundY, theme, time);
+  if (visible(padX + 400, 150)) drawRefinery(ctx, padX + 400, groundY, theme, accent, time);
+  if (visible(padX + 700, 120)) drawHangar(ctx, padX + 700, groundY, theme, accent, time);
+  drawDerrick(ctx, padX, groundY, theme, accent, time);
+
+  for (const ox of [-215, 215, -450, 570, -860, 900]) {
+    if (visible(padX + ox, 20)) drawLightPole(ctx, padX + ox, groundY, theme, time + ox);
   }
 
-  if (visible(padX - 580, 120)) drawOffice(ctx, padX - 580, groundY, accent, time);
-  if (visible(padX - 330, 60)) drawFuelPump(ctx, padX - 330, groundY, time);
-  if (visible(padX + 380, 140)) drawOreDepot(ctx, padX + 380, groundY, accent, time);
-  if (visible(padX + 680, 110)) drawGarage(ctx, padX + 680, groundY, accent);
-  drawDerrick(ctx, padX, groundY, accent, time);
-
-  // Lamp posts and fence segments
-  for (const ox of [-215, 215, -440, 560]) {
-    if (visible(padX + ox, 20)) drawLamp(ctx, padX + ox, groundY, time);
-  }
-  for (const [a, b] of [
-    [-880, -640],
-    [700, 900],
-  ] as const) {
-    if (visible(padX + (a + b) / 2, (b - a) / 2)) drawFence(ctx, padX + a, padX + b, groundY);
-  }
-
-  // Workers pacing between buildings
-  for (let i = 0; i < 4; i++) {
-    const [from, to] = i === 0 ? [-470, -330] : i === 1 ? [230, 420] : i === 2 ? [-250, -120] : [520, 650];
-    const speed = 22 + i * 6;
-    const span = to - from;
-    const phase = (time * speed + i * 97) % (span * 2);
-    const forward = phase < span;
-    const x = padX + from + (forward ? phase : span * 2 - phase);
-    if (visible(x, 10)) drawWorker(ctx, x, groundY, forward ? 1 : -1, time * 9 + i, i);
+  // Drones drifting between buildings
+  for (let i = 0; i < 3; i++) {
+    const span = 520;
+    const phase = (time * (30 + i * 9) + i * 211) % (span * 2);
+    const dx = phase < span ? phase : span * 2 - phase;
+    const x = padX - 480 + i * 330 + dx * 0.6;
+    const y = groundY - 150 - i * 40 + Math.sin(time * 2 + i) * 8;
+    if (visible(x, 10)) drawSkyDrone(ctx, x, y, i % 2 ? theme.sign : accent, time + i);
   }
 
   ctx.restore();
 }
 
-function outlinedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, fill: string): void {
-  ctx.fillStyle = fill;
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 2.5;
-  ctx.strokeRect(x, y, w, h);
-}
-
-function drawTree(ctx: CanvasRenderingContext2D, x: number, groundY: number, s: number, theme: SurfaceTheme): void {
-  ctx.fillStyle = theme.trunk;
-  ctx.fillRect(x - 4 * s, groundY - 34 * s, 8 * s, 34 * s);
-  ctx.fillStyle = theme.foliageDark;
-  ctx.beginPath();
-  ctx.arc(x, groundY - 50 * s, 26 * s, 0, Math.PI * 2);
-  ctx.arc(x - 18 * s, groundY - 36 * s, 18 * s, 0, Math.PI * 2);
-  ctx.arc(x + 18 * s, groundY - 38 * s, 19 * s, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = theme.foliage;
-  ctx.beginPath();
-  ctx.arc(x - 5 * s, groundY - 56 * s, 18 * s, 0, Math.PI * 2);
-  ctx.arc(x + 10 * s, groundY - 44 * s, 12 * s, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawOffice(ctx: CanvasRenderingContext2D, x: number, g: number, accent: string, time: number): void {
-  const w = 190;
-  const h = 112;
-  const left = x - w / 2;
-  // Main block
-  outlinedRect(ctx, left, g - h, w, h, '#c9b79c');
-  ctx.fillStyle = '#b09a7c';
-  ctx.fillRect(left + 2, g - h + h * 0.5, w - 4, h * 0.5 - 2);
-  // Roof
-  ctx.fillStyle = '#5d4037';
-  ctx.beginPath();
-  ctx.moveTo(left - 12, g - h);
-  ctx.lineTo(left + w + 12, g - h);
-  ctx.lineTo(left + w - 6, g - h - 18);
-  ctx.lineTo(left + 6, g - h - 18);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  // Sign board
-  outlinedRect(ctx, x - 70, g - h - 44, 140, 26, '#1b2433');
-  ctx.fillStyle = accent;
-  ctx.font = '700 13px "Chakra Petch", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('CORE DIVER CO.', x, g - h - 31);
-  ctx.strokeStyle = OUTLINE;
-  ctx.beginPath();
-  ctx.moveTo(x - 50, g - h - 18);
-  ctx.lineTo(x - 50, g - h);
-  ctx.moveTo(x + 50, g - h - 18);
-  ctx.lineTo(x + 50, g - h);
-  ctx.stroke();
-  // Windows, a couple lit and flickering gently
-  for (let r = 0; r < 2; r++) {
-    for (let c = 0; c < 4; c++) {
-      const wx = left + 18 + c * 44;
-      const wy = g - h + 14 + r * 46;
-      if (r === 1 && c === 1) continue;
-      const lit = (c + r) % 3 === 0 && Math.sin(time * 0.7 + c) > -0.6;
-      outlinedRect(ctx, wx, wy, 26, 22, lit ? '#ffe9a8' : '#3c5a75');
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillRect(wx + 3, wy + 3, 6, 16);
+function windowGrid(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  cols: number,
+  rows: number,
+  color: string,
+  seed: number,
+  time: number
+): void {
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const k = (seed * 31 + r * 7 + c * 13) % 11;
+      const on = k > 2 || Math.sin(time * 0.7 + k) > 0.6;
+      ctx.fillStyle = on ? rgba(color, k > 7 ? 0.9 : 0.55) : 'rgba(255,255,255,0.05)';
+      ctx.fillRect(x + c * 16, y + r * 18, 9, 6);
     }
   }
-  // Door
-  outlinedRect(ctx, left + 52, g - 44, 30, 44, '#6d4c41');
-  ctx.fillStyle = '#ffd54f';
-  ctx.fillRect(left + 76, g - 24, 3, 3);
-  // Awning stripe
-  ctx.fillStyle = accent;
-  ctx.fillRect(left + 46, g - 52, 42, 6);
 }
 
-function drawFuelPump(ctx: CanvasRenderingContext2D, x: number, g: number, time: number): void {
-  // Tank on stilts
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(x - 30, g);
-  ctx.lineTo(x - 26, g - 52);
-  ctx.moveTo(x + 30, g);
-  ctx.lineTo(x + 26, g - 52);
-  ctx.stroke();
-  ctx.fillStyle = '#2e7d32';
-  ctx.beginPath();
-  ctx.ellipse(x, g - 70, 42, 24, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  ctx.fillStyle = '#66bb6a';
-  ctx.beginPath();
-  ctx.ellipse(x - 12, g - 78, 18, 7, -0.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#e8f5e9';
-  ctx.font = '700 11px "Chakra Petch", sans-serif';
+function neonSign(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, size: number, time: number): void {
+  const flicker = Math.sin(time * 17) > 0.97 ? 0.45 : 1;
+  ctx.save();
+  ctx.font = `700 ${size}px "Orbitron", "Rajdhani", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('FUEL', x, g - 66);
-  // Pump box with blinking light
-  outlinedRect(ctx, x + 40, g - 40, 22, 40, '#d84315');
-  ctx.fillStyle = Math.sin(time * 4) > 0 ? '#69f0ae' : '#1b5e20';
-  ctx.fillRect(x + 46, g - 34, 10, 6);
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x + 62, g - 26);
-  ctx.quadraticCurveTo(x + 78, g - 8, x + 70, g - 2);
-  ctx.stroke();
+  ctx.globalAlpha = flicker;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = mix(color, '#ffffff', 0.35);
+  ctx.fillText(text, x, y);
+  ctx.restore();
 }
 
-/** Drill derrick straddling the shaft mouth: two pad slabs either side of the hole the pod drops through. */
-function drawDerrick(ctx: CanvasRenderingContext2D, x: number, g: number, accent: string, time: number): void {
+function drawHQ(ctx: CanvasRenderingContext2D, x: number, g: number, t: SurfaceTheme, accent: string, time: number): void {
+  // Stepped tower: wide base block and a narrow upper block with an antenna
+  ctx.fillStyle = '#0b0620';
+  ctx.fillRect(x - 120, g - 150, 240, 150);
+  ctx.fillRect(x - 60, g - 250, 120, 100);
+  neonStroke(ctx, rectPath(x - 120, g - 150, 240, 150), accent, 2);
+  neonStroke(ctx, rectPath(x - 60, g - 250, 120, 100), accent, 2);
+  windowGrid(ctx, x - 104, g - 120, 13, 5, t.sign, 1, time);
+  windowGrid(ctx, x - 44, g - 230, 6, 4, t.sign, 5, time);
+  const ant = new Path2D();
+  ant.moveTo(x + 40, g - 250);
+  ant.lineTo(x + 40, g - 320);
+  neonStroke(ctx, ant, accent, 1.6);
+  ctx.fillStyle = Math.sin(time * 3) > 0 ? '#ff2e88' : '#3a0a1e';
+  ctx.beginPath();
+  ctx.arc(x + 40, g - 322, 4, 0, Math.PI * 2);
+  ctx.fill();
+  neonSign(ctx, 'CORE DIVER', x - 10, g - 272, accent, 20, time);
+}
+
+function drawFuelStation(ctx: CanvasRenderingContext2D, x: number, g: number, t: SurfaceTheme, time: number): void {
+  const green = '#39ff88';
+  ctx.fillStyle = '#071510';
+  ctx.fillRect(x - 60, g - 96, 120, 12);
+  const canopy = rectPath(x - 60, g - 96, 120, 12);
+  neonStroke(ctx, canopy, green, 2);
+  for (const dx of [-48, 48]) {
+    const post = new Path2D();
+    post.moveTo(x + dx, g - 84);
+    post.lineTo(x + dx, g);
+    neonStroke(ctx, post, green, 1.4);
+  }
+  ctx.fillStyle = '#081a12';
+  ctx.fillRect(x - 14, g - 52, 28, 52);
+  neonStroke(ctx, rectPath(x - 14, g - 52, 28, 52), green, 1.8);
+  const pulse = 0.5 + 0.5 * Math.sin(time * 4);
+  ctx.fillStyle = rgba(green, 0.4 + pulse * 0.5);
+  ctx.fillRect(x - 8, g - 44, 16, 10);
+  neonSign(ctx, 'FUEL', x, g - 112, green, 16, time);
+  void t;
+}
+
+function drawDerrick(ctx: CanvasRenderingContext2D, x: number, g: number, t: SurfaceTheme, accent: string, time: number): void {
   const h = 176;
   const base = 150;
   const top = 26;
-  ctx.strokeStyle = '#3d4a56';
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(x - base, g);
-  ctx.lineTo(x - top, g - h);
-  ctx.moveTo(x + base, g);
-  ctx.lineTo(x + top, g - h);
-  ctx.stroke();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = '#56636f';
-  ctx.beginPath();
-  for (let i = 1; i < 5; i++) {
+  const truss = new Path2D();
+  truss.moveTo(x - base, g);
+  truss.lineTo(x - top, g - h);
+  truss.lineTo(x + top, g - h);
+  truss.lineTo(x + base, g);
+  for (let i = 1; i <= 5; i++) {
     const y0 = g - ((i - 1) * h) / 5;
     const y1 = g - (i * h) / 5;
     const half0 = base - ((base - top) * (i - 1)) / 5;
     const half1 = base - ((base - top) * i) / 5;
-    if (i > 1) {
-      ctx.moveTo(x - half0, y0);
-      ctx.lineTo(x + half1, y1);
-      ctx.moveTo(x + half0, y0);
-      ctx.lineTo(x - half1, y1);
-    }
-    ctx.moveTo(x - half1, y1);
-    ctx.lineTo(x + half1, y1);
+    truss.moveTo(x - half0, y0);
+    truss.lineTo(x + half1, y1);
+    truss.moveTo(x + half0, y0);
+    truss.lineTo(x - half1, y1);
+    truss.moveTo(x - half1, y1);
+    truss.lineTo(x + half1, y1);
   }
-  ctx.stroke();
-  // Crown block, spinning sheave and the winch cable down the shaft
-  outlinedRect(ctx, x - 30, g - h - 14, 60, 16, '#455a64');
-  ctx.strokeStyle = 'rgba(30, 30, 30, 0.8)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x, g - h);
-  ctx.lineTo(x, g - 40);
-  ctx.stroke();
+  ctx.strokeStyle = rgba(accent, 0.12);
+  ctx.lineWidth = 8;
+  ctx.stroke(truss);
+  ctx.strokeStyle = rgba(mix(accent, '#ffffff', 0.2), 0.8);
+  ctx.lineWidth = 1.6;
+  ctx.stroke(truss);
+
+  // Winch cable and spinning sheave
+  const cable = new Path2D();
+  cable.moveTo(x, g - h);
+  cable.lineTo(x, g - 40);
+  neonStroke(ctx, cable, t.sign, 1);
   ctx.save();
-  ctx.translate(x, g - h - 22);
+  ctx.translate(x, g - h - 16);
   ctx.rotate(time * 1.5);
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(0, 0, 11, 0, Math.PI * 2);
-  ctx.moveTo(-11, 0);
-  ctx.lineTo(11, 0);
-  ctx.moveTo(0, -11);
-  ctx.lineTo(0, 11);
-  ctx.stroke();
+  const wheel = new Path2D();
+  wheel.arc(0, 0, 12, 0, Math.PI * 2);
+  wheel.moveTo(-12, 0);
+  wheel.lineTo(12, 0);
+  wheel.moveTo(0, -12);
+  wheel.lineTo(0, 12);
+  neonStroke(ctx, wheel, t.sign, 2);
   ctx.restore();
-  ctx.fillStyle = Math.sin(time * 3) > 0 ? '#ff5252' : '#5d1010';
-  ctx.beginPath();
-  ctx.arc(x, g - h - 38, 4, 0, Math.PI * 2);
-  ctx.fill();
-  // Pad slabs with hazard stripes, leaving the shaft mouth open
+
+  // Pad slabs with chevron light strips that chase toward the shaft
   for (const dir of [-1, 1]) {
     const x0 = dir < 0 ? x - 176 : x + 112;
-    outlinedRect(ctx, x0, g - 10, 64, 10, '#263238');
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x0 + 2, g - 9, 60, 6);
-    ctx.clip();
-    ctx.fillStyle = accent;
-    for (let sx = x0 - 8; sx < x0 + 70; sx += 16) {
-      ctx.beginPath();
-      ctx.moveTo(sx, g - 3);
-      ctx.lineTo(sx + 8, g - 3);
-      ctx.lineTo(sx + 14, g - 9);
-      ctx.lineTo(sx + 6, g - 9);
-      ctx.closePath();
-      ctx.fill();
+    ctx.fillStyle = '#0b0620';
+    ctx.fillRect(x0, g - 10, 64, 10);
+    neonStroke(ctx, rectPath(x0, g - 10, 64, 10), accent, 1.4);
+    for (let k = 0; k < 4; k++) {
+      const lit = Math.floor(time * 6) % 4 === (dir < 0 ? k : 3 - k);
+      ctx.fillStyle = lit ? mix(accent, '#ffffff', 0.4) : rgba(accent, 0.35);
+      ctx.fillRect(x0 + 6 + k * 15, g - 7, 8, 4);
     }
-    ctx.restore();
   }
 }
 
-function drawOreDepot(ctx: CanvasRenderingContext2D, x: number, g: number, accent: string, time: number): void {
-  // Silo
-  const sx = x + 70;
-  outlinedRect(ctx, sx - 34, g - 120, 68, 120, '#90a4ae');
-  ctx.fillStyle = '#78909c';
-  for (let i = 0; i < 4; i++) ctx.fillRect(sx - 32, g - 112 + i * 28, 64, 4);
-  ctx.fillStyle = '#546e7a';
-  ctx.beginPath();
-  ctx.moveTo(sx - 38, g - 120);
-  ctx.lineTo(sx, g - 146);
-  ctx.lineTo(sx + 38, g - 120);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  ctx.fillStyle = '#263238';
-  ctx.font = '700 11px "Chakra Petch", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('ORE', sx, g - 70);
-  // Conveyor rising from the hopper to the silo
-  const x0 = x - 90;
-  const y0 = g - 22;
-  const x1 = sx - 30;
-  const y1 = g - 108;
-  ctx.strokeStyle = '#37474f';
-  ctx.lineWidth = 10;
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x1, y1);
-  ctx.stroke();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x0, y0 - 5);
-  ctx.lineTo(x1, y1 - 5);
-  ctx.moveTo(x0, y0 + 5);
-  ctx.lineTo(x1, y1 + 5);
-  ctx.stroke();
-  // Ore chunks riding the belt
-  const len = Math.hypot(x1 - x0, y1 - y0);
-  const ores = ['#212121', '#e07a3a', '#212121', '#b0bec5', '#212121', '#ffd54f'];
-  for (let i = 0; i < 6; i++) {
-    const t = ((time * 32 + i * (len / 6)) % len) / len;
-    ctx.fillStyle = ores[i];
+function drawRefinery(ctx: CanvasRenderingContext2D, x: number, g: number, t: SurfaceTheme, accent: string, time: number): void {
+  // Two silos and a block, joined by a conveyor carrying glowing ore
+  ctx.fillStyle = '#0b0620';
+  ctx.fillRect(x + 40, g - 170, 70, 170);
+  ctx.fillRect(x + 120, g - 130, 50, 130);
+  ctx.fillRect(x - 120, g - 70, 110, 70);
+  neonStroke(ctx, rectPath(x + 40, g - 170, 70, 170), t.sign, 2);
+  neonStroke(ctx, rectPath(x + 120, g - 130, 50, 130), t.sign, 2);
+  neonStroke(ctx, rectPath(x - 120, g - 70, 110, 70), t.sign, 2);
+  for (let k = 0; k < 6; k++) {
+    ctx.fillStyle = rgba(t.sign, 0.25 + 0.2 * Math.sin(time * 2 + k));
+    ctx.fillRect(x + 50, g - 160 + k * 26, 50, 3);
+  }
+  windowGrid(ctx, x - 108, g - 56, 6, 2, accent, 3, time);
+  const belt = new Path2D();
+  belt.moveTo(x - 30, g - 70);
+  belt.lineTo(x + 40, g - 150);
+  neonStroke(ctx, belt, accent, 1.8);
+  for (let k = 0; k < 4; k++) {
+    const p = ((time * 0.25 + k / 4) % 1);
+    ctx.fillStyle = k % 2 ? '#ffd23f' : '#00f0ff';
     ctx.beginPath();
-    ctx.arc(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - 8, 4.5, 0, Math.PI * 2);
+    ctx.arc(x - 30 + 70 * p, g - 74 - 80 * p, 3, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Supports
-  ctx.strokeStyle = '#455a64';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  for (const t of [0.3, 0.65]) {
-    const px = x0 + (x1 - x0) * t;
-    const py = y0 + (y1 - y0) * t;
-    ctx.moveTo(px, py + 5);
-    ctx.lineTo(px, g);
+  neonSign(ctx, 'ORE', x + 75, g - 188, t.sign, 16, time);
+}
+
+function drawHangar(ctx: CanvasRenderingContext2D, x: number, g: number, t: SurfaceTheme, accent: string, time: number): void {
+  const shell = new Path2D();
+  shell.moveTo(x - 110, g);
+  shell.lineTo(x - 110, g - 70);
+  shell.quadraticCurveTo(x, g - 140, x + 110, g - 70);
+  shell.lineTo(x + 110, g);
+  ctx.fillStyle = '#0b0620';
+  ctx.fill(shell);
+  neonStroke(ctx, shell, accent, 2);
+  ctx.fillStyle = '#05030e';
+  ctx.fillRect(x - 70, g - 70, 140, 70);
+  for (let k = 0; k < 6; k++) {
+    ctx.fillStyle = rgba(t.sign, 0.15 + (k % 2) * 0.1);
+    ctx.fillRect(x - 66, g - 64 + k * 11, 132, 3);
   }
-  ctx.stroke();
-  // Hopper
-  ctx.fillStyle = accent;
+  neonStroke(ctx, rectPath(x - 70, g - 70, 140, 70), t.sign, 1.4);
+  neonSign(ctx, 'HANGAR', x, g - 96, accent, 13, time);
+}
+
+function drawLightPole(ctx: CanvasRenderingContext2D, x: number, g: number, t: SurfaceTheme, time: number): void {
+  const pole = new Path2D();
+  pole.moveTo(x, g);
+  pole.lineTo(x, g - 74);
+  neonStroke(ctx, pole, t.ridge, 1.2);
+  const glow = 0.7 + 0.3 * Math.sin(time * 1.3);
+  const halo = ctx.createRadialGradient(x, g - 78, 1, x, g - 78, 26);
+  halo.addColorStop(0, rgba(t.sign, 0.6 * glow));
+  halo.addColorStop(1, rgba(t.sign, 0));
+  ctx.fillStyle = halo;
+  ctx.fillRect(x - 26, g - 104, 52, 52);
+  ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.moveTo(x0 - 34, g - 40);
-  ctx.lineTo(x0 + 14, g - 40);
-  ctx.lineTo(x0 + 4, g - 12);
-  ctx.lineTo(x0 - 24, g - 12);
+  ctx.arc(x, g - 78, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawSkyDrone(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, time: number): void {
+  const body = new Path2D();
+  body.ellipse(x, y, 10, 4, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#0b0620';
+  ctx.fill(body);
+  neonStroke(ctx, body, color, 1.4);
+  const beam = ctx.createLinearGradient(x, y, x, y + 40);
+  beam.addColorStop(0, rgba(color, 0.35 + 0.15 * Math.sin(time * 5)));
+  beam.addColorStop(1, rgba(color, 0));
+  ctx.fillStyle = beam;
+  ctx.beginPath();
+  ctx.moveTo(x - 3, y + 3);
+  ctx.lineTo(x + 3, y + 3);
+  ctx.lineTo(x + 12, y + 40);
+  ctx.lineTo(x - 12, y + 40);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  outlinedRect(ctx, x0 - 22, g - 12, 24, 12, '#37474f');
-}
-
-function drawGarage(ctx: CanvasRenderingContext2D, x: number, g: number, accent: string): void {
-  const w = 170;
-  const h = 86;
-  const left = x - w / 2;
-  outlinedRect(ctx, left, g - h, w, h, '#8d6e63');
-  // Curved roof
-  ctx.fillStyle = '#6d4c41';
-  ctx.beginPath();
-  ctx.moveTo(left - 8, g - h);
-  ctx.quadraticCurveTo(x, g - h - 46, left + w + 8, g - h);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  // Roll-up door
-  outlinedRect(ctx, x - 52, g - 64, 104, 64, '#b0bec5');
-  ctx.fillStyle = '#90a4ae';
-  for (let i = 0; i < 8; i++) ctx.fillRect(x - 50, g - 60 + i * 8, 100, 3);
-  // Hazard header
-  ctx.fillStyle = accent;
-  ctx.fillRect(x - 52, g - 70, 104, 6);
-  ctx.fillStyle = '#eceff1';
-  ctx.font = '700 11px "Chakra Petch", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('GARAGE', x, g - h - 10);
-}
-
-function drawLamp(ctx: CanvasRenderingContext2D, x: number, g: number, time: number): void {
-  ctx.strokeStyle = '#37474f';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(x, g);
-  ctx.lineTo(x, g - 62);
-  ctx.lineTo(x + 12, g - 62);
-  ctx.stroke();
-  const flicker = 0.75 + Math.sin(time * 11 + x) * 0.05;
-  const glow = ctx.createRadialGradient(x + 12, g - 58, 1, x + 12, g - 58, 34);
-  glow.addColorStop(0, `rgba(255, 236, 170, ${0.6 * flicker})`);
-  glow.addColorStop(1, 'rgba(255, 236, 170, 0)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(x - 24, g - 94, 72, 72);
-  ctx.fillStyle = '#fff3c4';
-  ctx.fillRect(x + 8, g - 60, 8, 5);
-}
-
-function drawFence(ctx: CanvasRenderingContext2D, x0: number, x1: number, g: number): void {
-  ctx.strokeStyle = '#6d4c41';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(x0, g - 16);
-  ctx.lineTo(x1, g - 16);
-  ctx.moveTo(x0, g - 8);
-  ctx.lineTo(x1, g - 8);
-  for (let x = x0; x <= x1; x += 24) {
-    ctx.moveTo(x, g);
-    ctx.lineTo(x, g - 22);
-  }
-  ctx.stroke();
-}
-
-function drawWorker(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  g: number,
-  dir: number,
-  walk: number,
-  variant: number
-): void {
-  const step = Math.sin(walk);
-  const bob = Math.abs(step) * 1.5;
-  ctx.save();
-  ctx.translate(x, g - bob);
-  ctx.scale(dir, 1);
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  // Legs
-  ctx.beginPath();
-  ctx.moveTo(-2, -12);
-  ctx.lineTo(-2 + step * 4, 0);
-  ctx.moveTo(2, -12);
-  ctx.lineTo(2 - step * 4, 0);
-  ctx.stroke();
-  // Body (overalls) and head with hard hat
-  const suit = ['#1e88e5', '#f57c00', '#43a047', '#8e24aa'][variant % 4];
-  ctx.fillStyle = suit;
-  ctx.fillRect(-5, -26, 10, 15);
-  ctx.lineWidth = 2;
-  ctx.strokeRect(-5, -26, 10, 15);
-  ctx.fillStyle = '#ffcc80';
-  ctx.beginPath();
-  ctx.arc(0, -31, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = '#ffd600';
-  ctx.beginPath();
-  ctx.arc(0, -33, 6, Math.PI, 0);
-  ctx.fill();
-  ctx.stroke();
-  // Pickaxe over the shoulder
-  ctx.strokeStyle = '#6d4c41';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-4, -16);
-  ctx.lineTo(6, -34);
-  ctx.stroke();
-  ctx.strokeStyle = '#90a4ae';
-  ctx.beginPath();
-  ctx.moveTo(1, -37);
-  ctx.quadraticCurveTo(7, -36, 11, -30);
-  ctx.stroke();
-  ctx.restore();
 }

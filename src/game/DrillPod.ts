@@ -1,4 +1,5 @@
 import { ComputedPlayerStats } from '../config/skillTree';
+import { neonStratum, oreNeon } from '../assets/neonArt';
 import { ORES } from '../config/ores';
 import { DiveWorld, TILE_SIZE, WORLD_COLS, METERS_PER_ROW, WorldBlock, rarestOre } from './DiveWorld';
 import { ParticleSystem } from './ParticleSystem';
@@ -418,7 +419,7 @@ export class DrillPod {
 
     const oreId = b.oreId;
     const oreCfg = oreId ? ORES[oreId] : null;
-    particles.spawnBlockBurst(bx, by, stratum.palette.base, oreCfg?.color, oreCfg ? 12 : 7);
+    particles.spawnBlockBurst(bx, by, neonStratum(stratum.id).glow, oreCfg ? oreNeon(oreCfg) : undefined, oreCfg ? 12 : 7);
     sound.playBlockBreak(false);
     this.events.push({
       kind: b.armored ? 'armored' : oreCfg ? 'ore' : 'break',

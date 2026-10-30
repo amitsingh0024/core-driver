@@ -2,7 +2,6 @@ import { GameContext } from '../core/GameContext';
 import { fitCanvasToDisplay, podLayers } from '../render/podView';
 import { $ } from '../ui/dom';
 import { TILE_SIZE } from '../game/DiveWorld';
-import { flatRockTile } from '../render/rockTiles';
 import { drawGroundLip, drawSurfaceBase, drawSurfaceSky } from '../render/SurfaceBase';
 
 /** Animated planet surface with the idling pod behind the title menu. */
@@ -35,8 +34,7 @@ export class TitleScreen {
     drawSurfaceBase(ctx, planet, padX, groundY, w, t);
 
     // Ground: first-stratum rock with the shaft mouth open under the derrick
-    const sheetTile = this.game.atlas.blockTiles.get(planet.strata[0].id);
-    const rock = sheetTile ? flatRockTile(sheetTile) : undefined;
+    const rock = this.game.atlas.blockTiles.get(planet.strata[0].id);
     const T = TILE_SIZE;
     const holeHalf = T * 2.5;
     for (let y = groundY; y < h; y += T) {

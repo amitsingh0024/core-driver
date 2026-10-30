@@ -69,52 +69,37 @@ export const SVG_ICONS: Record<string, string> = {
 export const CORE_DIVER_LOGO_SVG = `
 <svg viewBox="0 0 760 220" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="logoSteel" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#7a8188"/>
-      <stop offset="18%" stop-color="#555b62"/>
-      <stop offset="100%" stop-color="#33373c"/>
-    </linearGradient>
-    <linearGradient id="logoPaint" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffe07a"/>
-      <stop offset="50%" stop-color="#f6b916"/>
-      <stop offset="100%" stop-color="#d48f06"/>
+    <linearGradient id="logoSun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffd23f"/>
+      <stop offset="100%" stop-color="#ff2e88"/>
     </linearGradient>
     <linearGradient id="logoChrome" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="50%" stop-color="#dfe3e6"/>
-      <stop offset="52%" stop-color="#a7aeb5"/>
-      <stop offset="100%" stop-color="#eef0f2"/>
+      <stop offset="0%" stop-color="#e6ffff"/>
+      <stop offset="48%" stop-color="#7df9ff"/>
+      <stop offset="52%" stop-color="#2b5cff"/>
+      <stop offset="100%" stop-color="#b967ff"/>
     </linearGradient>
-    <pattern id="logoHazard" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="14" height="28" fill="#f6b916"/>
-      <rect x="14" width="14" height="28" fill="#1d1d1f"/>
-    </pattern>
-    <filter id="logoDrop" x="-10%" y="-10%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="6" stdDeviation="0" flood-color="#000" flood-opacity="0.45"/>
+    <filter id="logoGlow" x="-20%" y="-40%" width="140%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <g filter="url(#logoDrop)">
-    <!-- Bolted steel sign -->
-    <path d="M38 22h684l24 24v128l-24 24H38l-24-24V46z" fill="url(#logoSteel)" stroke="#17191c" stroke-width="7"/>
-    <path d="M42 30h676l18 18v8H24v-8z" fill="url(#logoHazard)" stroke="#17191c" stroke-width="4"/>
-    <g fill="#c9ced3" stroke="#17191c" stroke-width="3">
-      <circle cx="40" cy="80" r="6"/><circle cx="720" cy="80" r="6"/>
-      <circle cx="40" cy="172" r="6"/><circle cx="720" cy="172" r="6"/>
+  <!-- Drill emblem: neon pod over a striped sun -->
+  <g transform="translate(100, 112)" filter="url(#logoGlow)">
+    <circle cx="0" cy="0" r="58" fill="url(#logoSun)" opacity="0.9"/>
+    <g fill="#07021a">
+      <rect x="-60" y="8" width="120" height="4"/><rect x="-60" y="22" width="120" height="6"/>
+      <rect x="-60" y="38" width="120" height="8"/>
     </g>
-    <!-- Drill emblem -->
-    <g transform="translate(108, 118)">
-      <circle cx="0" cy="-14" r="34" fill="url(#logoPaint)" stroke="#17191c" stroke-width="6"/>
-      <circle cx="0" cy="-16" r="15" fill="#4fd8f0" stroke="#17191c" stroke-width="5"/>
-      <circle cx="-5" cy="-21" r="4" fill="#ffffff"/>
-      <polygon points="-26,16 26,16 0,64" fill="url(#logoChrome)" stroke="#17191c" stroke-width="6" stroke-linejoin="round"/>
-      <line x1="-16" y1="28" x2="16" y2="34" stroke="#17191c" stroke-width="4"/>
-      <line x1="-9" y1="43" x2="9" y2="47" stroke="#17191c" stroke-width="4"/>
-    </g>
-    <!-- Wordmark -->
-    <text x="172" y="134" textLength="530" lengthAdjust="spacingAndGlyphs" font-family="'Bungee', sans-serif" font-size="78" fill="url(#logoPaint)" stroke="#17191c" stroke-width="10" stroke-linejoin="round" paint-order="stroke">CORE <tspan fill="url(#logoChrome)">DIVER</tspan></text>
-    <!-- Tagline plate -->
-    <rect x="172" y="148" width="530" height="30" rx="4" fill="#17191c"/>
-    <text x="437" y="171" text-anchor="middle" textLength="500" lengthAdjust="spacingAndGlyphs" font-family="'Barlow Condensed', sans-serif" font-weight="800" font-size="22" letter-spacing="6" fill="#f6b916">PLANETARY EXCAVATION CONTRACTORS</text>
+    <rect x="-22" y="-44" width="44" height="50" rx="16" fill="#100f24" stroke="#00f0ff" stroke-width="4"/>
+    <ellipse cx="0" cy="-22" rx="12" ry="8" fill="#00f0ff"/>
+    <polygon points="-20,8 20,8 0,50" fill="#100f24" stroke="#00f0ff" stroke-width="4" stroke-linejoin="round"/>
   </g>
+  <!-- Wordmark -->
+  <g filter="url(#logoGlow)">
+    <text x="182" y="122" textLength="540" lengthAdjust="spacingAndGlyphs" font-family="'Orbitron', sans-serif" font-weight="900" font-size="74" font-style="italic" fill="url(#logoChrome)" stroke="#ff2e88" stroke-width="2.5" paint-order="stroke">CORE DIVER</text>
+  </g>
+  <line x1="182" y1="142" x2="722" y2="142" stroke="#ff2e88" stroke-width="2.5" filter="url(#logoGlow)"/>
+  <text x="452" y="176" text-anchor="middle" textLength="520" lengthAdjust="spacingAndGlyphs" font-family="'Orbitron', sans-serif" font-weight="700" font-size="20" letter-spacing="8" fill="#00f0ff" filter="url(#logoGlow)">DEEP-GRID MINING SYNDICATE</text>
 </svg>
 `;
