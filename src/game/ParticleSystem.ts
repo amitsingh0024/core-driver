@@ -25,10 +25,27 @@ export interface FloatingText {
 export class ParticleSystem {
   private particles: Particle[] = [];
   private texts: FloatingText[] = [];
+  /** Dead particles kept for reuse, so block bursts don't allocate in the frame loop. */
+  private pool: Particle[] = [];
 
   public clear(): void {
+    for (const p of this.particles) this.pool.push(p);
     this.particles.length = 0;
     this.texts.length = 0;
+  }
+
+  private emit(x: number, y: number, vx: number, vy: number, size: number, color: string, life: number, maxLife: number, gravity: number): void {
+    const p = this.pool.pop() ?? ({} as Particle);
+    p.x = x;
+    p.y = y;
+    p.vx = vx;
+    p.vy = vy;
+    p.size = size;
+    p.color = color;
+    p.life = life;
+    p.maxLife = maxLife;
+    p.gravity = gravity;
+    this.particles.push(p);
   }
 
   public spawnRockSparks(x: number, y: number, color: string, count = 4): void {
@@ -36,17 +53,7 @@ export class ParticleSystem {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 35 + Math.random() * 95;
-      this.particles.push({
-        x,
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 25,
-        size: 2 + Math.random() * 2.5,
-        color,
-        life: 0.22 + Math.random() * 0.2,
-        maxLife: 0.42,
-        gravity: 220,
-      });
+      this.emit(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed - 25, 2 + Math.random() * 2.5, color, 0.22 + Math.random() * 0.2, 0.42, 220);
     }
   }
 
@@ -56,17 +63,17 @@ export class ParticleSystem {
       const angle = Math.random() * Math.PI * 2;
       const speed = 40 + Math.random() * 130;
       const useOre = oreColor && i % 2 === 0;
-      this.particles.push({
-        x: x + (Math.random() - 0.5) * 14,
-        y: y + (Math.random() - 0.5) * 14,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 35,
-        size: useOre ? 3.5 + Math.random() * 2.5 : 3 + Math.random() * 3,
-        color: useOre ? oreColor : baseColor,
-        life: 0.35 + Math.random() * 0.35,
-        maxLife: 0.7,
-        gravity: 280,
-      });
+      this.emit(
+        x + (Math.random() - 0.5) * 14,
+        y + (Math.random() - 0.5) * 14,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed - 35,
+        useOre ? 3.5 + Math.random() * 2.5 : 3 + Math.random() * 3,
+        useOre ? oreColor : baseColor,
+        0.35 + Math.random() * 0.35,
+        0.7,
+        280
+      );
     }
   }
 
@@ -97,7 +104,10 @@ export class ParticleSystem {
       const p = this.particles[i];
       p.life -= dt;
       if (p.life <= 0) {
-        this.particles.splice(i, 1);
+        // Swap-remove: draw order of sparks doesn't matter, and splice is O(n) per death
+        const last = this.particles.pop()!;
+        if (last !== p) this.particles[i] = last;
+        this.pool.push(p);
         continue;
       }
       p.vy += p.gravity * dt;

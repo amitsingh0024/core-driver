@@ -73,6 +73,13 @@ export class SoundManager {
         this.musicBus.gain.value = this.musicVolume;
         this.musicBus.connect(this.out);
         this.music = new MusicDirector(this.ctx, this.musicBus);
+        // iOS parks the context as "interrupted" after calls or Siri; resume once the page is back
+        this.ctx.addEventListener('statechange', () => {
+          const state = this.ctx?.state as string | undefined;
+          if ((state === 'interrupted' || state === 'suspended') && !document.hidden && !this.muted) {
+            this.ctx?.resume().catch(() => {});
+          }
+        });
       }
     }
     if (this.ctx && this.ctx.state === 'suspended' && !document.hidden) {

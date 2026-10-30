@@ -71,7 +71,10 @@ export class Game {
     const logoSlot = document.getElementById('boot-logo-slot');
     if (logoSlot) logoSlot.innerHTML = CORE_DIVER_LOGO_SVG;
 
-    document.addEventListener('pointerdown', () => this.ctx.sound.unlock(), { capture: true });
+    // iOS Safari only counts touchend/click as an audio-unlocking gesture, not pointerdown
+    for (const type of ['pointerdown', 'touchend', 'keydown']) {
+      document.addEventListener(type, () => this.ctx.sound.unlock(), { capture: true });
+    }
     document.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('button');
       // The winch button has its own audio; buying plays the upgrade chime

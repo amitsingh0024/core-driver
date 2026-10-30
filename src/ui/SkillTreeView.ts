@@ -1,3 +1,4 @@
+import { fitCanvasToDisplay } from '../render/podView';
 import {
   SKILL_NODES,
   SKILL_NODE_MAP,
@@ -275,13 +276,7 @@ export class SkillTreeView {
 
   public render(dt: number, save: SaveState): void {
     this.animTime += dt;
-    const dpr = window.devicePixelRatio || 1;
-    const w = this.canvas.clientWidth;
-    const h = this.canvas.clientHeight;
-    if (this.canvas.width !== Math.floor(w * dpr) || this.canvas.height !== Math.floor(h * dpr)) {
-      this.canvas.width = Math.floor(w * dpr);
-      this.canvas.height = Math.floor(h * dpr);
-    }
+    const { w, h, dpr } = fitCanvasToDisplay(this.canvas);
 
     const ctx = this.ctx;
     ctx.save();

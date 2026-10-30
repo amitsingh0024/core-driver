@@ -7,7 +7,7 @@ import { GameFeel } from '../game/GameFeel';
 import { DiveContract, ContractProgress, contractProgress, contractProgressText, rollContract } from '../game/DiveContract';
 import { DiveRenderer } from '../render/DiveRenderer';
 import { PortalSDK } from '../sdk/PortalSDK';
-import { $ } from '../ui/dom';
+import { $, setStyle, setText } from '../ui/dom';
 
 /** Active dive: world simulation, input, HUD and canvas rendering. */
 export class DiveScreen {
@@ -18,6 +18,8 @@ export class DiveScreen {
   public contract!: DiveContract;
   public contractCompleted = false;
   private canvas = $<HTMLCanvasElement>('dive-canvas');
+  private lowFuelVignette = $('low-fuel-vignette');
+  private coarsePointer = window.matchMedia?.('(pointer: coarse)');
   private renderer: DiveRenderer;
   private input: DiveInput;
   private endTransitionTimer = 0;
@@ -265,10 +267,10 @@ export class DiveScreen {
   }
 
   private setFuelAlarmVisuals(fuelPct: number): void {
-    const vig = $('low-fuel-vignette');
+    const vig = this.lowFuelVignette;
     vig.classList.toggle('low', fuelPct <= 25 && fuelPct > 10);
     vig.classList.toggle('critical', fuelPct <= 10);
-    $('btn-hold-extract').classList.toggle('urge', fuelPct <= 25);
+    this.hud.extractBtn.classList.toggle('urge', fuelPct <= 25);
   }
 
   private showToast(title: string, sub: string, color: string): void {
@@ -292,7 +294,7 @@ export class DiveScreen {
       if (coach.timer <= 0) tip.classList.remove('show', 'urgent');
     }
 
-    const touch = window.matchMedia?.('(pointer: coarse)').matches;
+    const touch = this.coarsePointer?.matches;
     const tips: { id: string; when: boolean; text: string; urgent?: boolean }[] = [
       {
         id: 'winch',
@@ -343,12 +345,32 @@ export class DiveScreen {
     this.game.particles.addFloatingText(this.pod.x, this.pod.y - 40, 'CONTRACT COMPLETE!', '#69f0ae', 1.25, `+$${this.contract.reward.toLocaleString()}`);
   }
 
+  /** HUD elements looked up once; the HUD updates every frame. */
+  private hud = {
+    stratumName: $('hud-stratum-name'),
+    fuelText: $('hud-fuel-text'),
+    fuelFill: $('hud-fuel-fill'),
+    fuelWrapper: $('fuel-bar-wrapper'),
+    fuelWarning: $('hud-fuel-warning'),
+    cargoText: $('hud-cargo-text'),
+    cargoMiniFill: $('hud-cargo-mini-fill'),
+    cargoPill: $('hud-cargo-pill'),
+    haulValue: $('hud-haul-value'),
+    contract: $('hud-contract'),
+    contractProgress: $('hud-contract-progress'),
+    contractFill: $('hud-contract-fill'),
+    markerPod: $('depth-marker-pod'),
+    markerBest: $('depth-marker-best'),
+    extractBtn: $('btn-hold-extract'),
+    extractRing: $('extract-radial-circle'),
+  };
+
   private updateDiveHUD(): void {
+    const hud = this.hud;
     const planet = this.world.planet;
     const { stratum } = this.world.getStratumForDepth(this.pod.depthMeters);
 
-    $('hud-stratum-name').textContent =
-      `${stratum.name} • ${this.pod.depthMeters}m`;
+    setText(hud.stratumName, `${stratum.name} • ${this.pod.depthMeters}m`);
 
     // Segmented Fuel Bar + Live Burn Rate (0 when idle!)
     const fuelPct = Math.max(0, Math.min(100, (this.pod.fuel / this.pod.maxFuel) * 100));
@@ -358,66 +380,55 @@ export class DiveScreen {
       ? `THRUST (-${this.pod.currentFuelBurnRate.toFixed(1)}/s)`
       : 'IDLE (0/s)';
 
-    $('hud-fuel-text').textContent =
-      `${Math.ceil(this.pod.fuel)} / ${this.pod.maxFuel} • ${statusLabel}`;
+    setText(hud.fuelText, `${Math.ceil(this.pod.fuel)} / ${this.pod.maxFuel} • ${statusLabel}`);
+    setStyle(hud.fuelFill, 'width', `${fuelPct.toFixed(1)}%`);
 
-    const fuelFill = $('hud-fuel-fill');
-    fuelFill.style.width = `${fuelPct}%`;
-
-    const fuelWrapper = $('fuel-bar-wrapper');
-    const fuelWarning = $('hud-fuel-warning');
-    if (fuelPct <= 25) {
-      fuelWrapper.classList.add('low-fuel');
-      fuelWrapper.classList.remove('warn-fuel');
-      fuelWarning.classList.remove('hidden');
-      fuelFill.style.background = 'linear-gradient(90deg, #d50000, #ff5252)';
-    } else if (fuelPct <= 40) {
-      fuelWrapper.classList.remove('low-fuel');
-      fuelWrapper.classList.add('warn-fuel');
-      fuelWarning.classList.add('hidden');
-      fuelFill.style.background = 'linear-gradient(90deg, #ff8f00, #ffd54f)';
-    } else {
-      fuelWrapper.classList.remove('low-fuel', 'warn-fuel');
-      fuelWarning.classList.add('hidden');
-      fuelFill.style.background = 'linear-gradient(90deg, #00c853, #69f0ae)';
-    }
+    const level = fuelPct <= 25 ? 'low' : fuelPct <= 40 ? 'warn' : 'ok';
+    hud.fuelWrapper.classList.toggle('low-fuel', level === 'low');
+    hud.fuelWrapper.classList.toggle('warn-fuel', level === 'warn');
+    hud.fuelWarning.classList.toggle('hidden', level !== 'low');
+    setStyle(
+      hud.fuelFill,
+      'background',
+      level === 'low'
+        ? 'linear-gradient(90deg, #d50000, #ff5252)'
+        : level === 'warn'
+        ? 'linear-gradient(90deg, #ff8f00, #ffd54f)'
+        : 'linear-gradient(90deg, #00c853, #69f0ae)'
+    );
 
     // Cargo Hold + Mini Fill Bar + Full Flash
-    $('hud-cargo-text').textContent =
-      `${this.pod.cargoUsed} / ${this.pod.maxCargo}`;
+    setText(hud.cargoText, `${this.pod.cargoUsed} / ${this.pod.maxCargo}`);
     const cargoPct = Math.min(100, (this.pod.cargoUsed / Math.max(1, this.pod.maxCargo)) * 100);
-    $('hud-cargo-mini-fill').style.width = `${cargoPct}%`;
-    document
-      .getElementById('hud-cargo-pill')!
-      .classList.toggle('cargo-full', this.pod.cargoUsed >= this.pod.maxCargo);
+    setStyle(hud.cargoMiniFill, 'width', `${cargoPct.toFixed(1)}%`);
+    hud.cargoPill.classList.toggle('cargo-full', this.pod.cargoUsed >= this.pod.maxCargo);
 
     const haulVal = this.haulValue();
-    $('hud-haul-value').textContent = `$${(haulVal + this.pod.relicCredits).toLocaleString()}`;
+    setText(hud.haulValue, `$${(haulVal + this.pod.relicCredits).toLocaleString()}`);
 
     const progress = this.contractState();
-    $('hud-contract-progress').textContent = contractProgressText(this.contract, progress);
+    setText(hud.contractProgress, contractProgressText(this.contract, progress));
     const pct = contractProgress(this.contract, progress);
-    $('hud-contract-fill').style.width = `${Math.round(pct * 100)}%`;
+    setStyle(hud.contractFill, 'width', `${Math.round(pct * 100)}%`);
     // Haul contracts settle on extraction, so show them as ready rather than paid
-    if (this.contract.kind === 'haul') $('hud-contract').classList.toggle('done', pct >= 1);
+    if (this.contract.kind === 'haul') hud.contract.classList.toggle('done', pct >= 1);
 
     // Vertical Depth Meter Markers
     const depthPct = Math.min(100, (this.pod.depthMeters / planet.maxDepth) * 100);
-    $('depth-marker-pod').style.top = `${depthPct}%`;
+    setStyle(hud.markerPod, 'top', `${depthPct.toFixed(1)}%`);
 
     const bestDepth = Math.max(
       this.pod.maxDepthReached,
       this.game.save.deepestByPlanet[planet.id] ?? 0
     );
     const bestPct = Math.min(100, (bestDepth / planet.maxDepth) * 100);
-    $('depth-marker-best').style.top = `${bestPct}%`;
+    setStyle(hud.markerBest, 'top', `${bestPct.toFixed(1)}%`);
 
     // Circular Radial SVG Extract Progress Ring (circumference = 2 * PI * 44 = 276.46)
-    $('btn-hold-extract').classList.toggle('beacon-charged', this.pod.beaconCharges > 0);
+    hud.extractBtn.classList.toggle('beacon-charged', this.pod.beaconCharges > 0);
 
-    const radialCircle = $('extract-radial-circle');
     const offset = 276.46 * (1 - Math.max(0, Math.min(1, this.pod.extractProgress)));
-    radialCircle.style.strokeDashoffset = `${offset.toFixed(2)}`;
+    setStyle(hud.extractRing, 'stroke-dashoffset', `${offset.toFixed(2)}`);
   }
 
   public pointer(): { down: boolean; x: number; y: number } {

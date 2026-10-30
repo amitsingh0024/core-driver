@@ -26,9 +26,17 @@ export function podLayers(
   };
 }
 
-/** Resizes a canvas backing store to its CSS size times devicePixelRatio. Returns the CSS size. */
+/**
+ * Device pixel ratio capped at 2. Phones report 3 or more, which makes every canvas
+ * fill 2.25x the pixels of 2x for no visible gain at this art's resolution.
+ */
+export function canvasDpr(): number {
+  return Math.min(2, window.devicePixelRatio || 1);
+}
+
+/** Resizes a canvas backing store to its CSS size times the capped devicePixelRatio. Returns the CSS size. */
 export function fitCanvasToDisplay(canvas: HTMLCanvasElement): { w: number; h: number; dpr: number } {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = canvasDpr();
   const w = canvas.clientWidth;
   const h = canvas.clientHeight;
   if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {

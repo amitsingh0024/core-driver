@@ -70,15 +70,20 @@ export class SpriteAtlas {
     });
   }
 
+  /** Loads a sheet as WebP (about 6x smaller), falling back to the PNG master if that fails. */
+  private loadSheet(name: string): Promise<HTMLImageElement> {
+    return this.loadImage(`sprites/${name}.webp`).catch(() => this.loadImage(`sprites/${name}.png`));
+  }
+
   /**
-   * Loads the pre-cut, halo-free transparent PNG atlases from /sprites/*.png
+   * Loads the pre-cut, halo-free transparent atlases from /sprites (WebP, PNG fallback)
    */
   private async loadTransparentPNGSheets(): Promise<void> {
     try {
       const [podsImg, oresImg, rocksImg] = await Promise.all([
-        this.loadImage('sprites/drill_pods_hd.png'),
-        this.loadImage('sprites/ores_gems_hd.png'),
-        this.loadImage('sprites/strata_rocks_hd.png'),
+        this.loadSheet('drill_pods_hd'),
+        this.loadSheet('ores_gems_hd'),
+        this.loadSheet('strata_rocks_hd'),
       ]);
 
       // 1. Slice 3 Drill Pods (192x256 master size each in 576x256 sheet)
