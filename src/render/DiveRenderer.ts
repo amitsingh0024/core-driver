@@ -706,7 +706,7 @@ function drawComboGemBadge(
   ctx.translate(x, y);
 
   const label = `×${comboCount} ${oreName}`;
-  ctx.font = '800 11px "Chakra Petch", sans-serif';
+  ctx.font = '700 13px "Barlow Condensed", sans-serif';
   const tw = ctx.measureText(label).width;
   const pillW = tw + 34;
   const pillH = 22;
