@@ -60,3 +60,15 @@ Goal: fuel is the dive's clock again, not an afterthought. Measured with a headl
 | Late P1 (T1+T2 maxed) | cargo full at ~285m, 95% fuel | cargo full at ~390m, 91% fuel; core runs (~800m) run out of fuel near the core |
 
 On Pyra (P2) a realistic entry rig now gets ~0.8 tanks from cells per dive (was ~1.8) and a mid-P2 rig ends a full-cargo dive with ~59% fuel (was 82%). Fully maxed rigs stay cargo-bound by design.
+
+## 6. Polish Pass (Oct 2026)
+- **Boot splash:** logo, load bar and "click or press any key", held until the sprite atlases and fonts are ready (4s cap). The click also unlocks browser audio, so music starts on the title.
+- **Music:** `MusicDirector` builds an ambient score from Web Audio oscillators (no audio files). Each planet has its own four-chord loop with plucks and an echo. In a dive the low-pass filter closes with depth, so the deep strata sound muffled. It has its own Music Volume slider, and the mute button now mutes everything without changing the volume sliders.
+- **Transitions:** fade-through-black between screens with a whoosh. Title and results cards settle in, and modals pop. A finished dive is settled exactly once, even while the fade keeps frames running.
+- **Fuel pressure feedback:** at 25% fuel a red edge pulse, a warning beep and a pulsing Extract button kick in. At 10% they get faster and harsher.
+- **Dive callouts:** a "NEW DEPTH RECORD" toast when you pass your previous best, and a "CARGO FULL" toast telling you to winch up.
+- **First-dive tips** (first 3 dives): contract, ore only pays at the surface, fuel cells, and an urgent "winch now" tip at 30% fuel.
+- **Interface feel:** click and hover sounds on every button, press-down scale, and a keyboard focus ring.
+- **Auto-pause** when the tab is hidden or the window loses focus. Audio is suspended while the tab is hidden.
+- **Reduced Motion setting:** defaults to the OS preference. It turns off shake, flattens CSS animation and shortens transitions.
+- **Page:** favicon, meta description and theme colour.

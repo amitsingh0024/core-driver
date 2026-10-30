@@ -30,7 +30,8 @@ export class DiveRenderer {
     const { stratum } = world.getStratumForDepth(pod.depthMeters);
 
     const worldPixelWidth = WORLD_COLS * TILE_SIZE;
-    const shakeMult = this.game.save.settings.screenShake ? 1 : 0;
+    const { screenShake, reducedMotion } = this.game.save.settings;
+    const shakeMult = screenShake && !reducedMotion ? 1 : 0;
     const shakeX = (Math.random() - 0.5) * pod.screenShake * shakeMult;
     const shakeY = (Math.random() - 0.5) * pod.screenShake * shakeMult;
     const camX = Math.round(worldPixelWidth * 0.5 - w * 0.5 + shakeX);

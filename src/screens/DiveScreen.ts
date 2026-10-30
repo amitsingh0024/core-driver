@@ -21,8 +21,16 @@ export class DiveScreen {
   private renderer: DiveRenderer;
   private input: DiveInput;
   private endTransitionTimer = 0;
+  private finished = false;
   private currentStratumId = '';
   private stratumBannerTimer = 0;
+  private fuelAlarmTimer = 0;
+  private toastTimer = 0;
+  private musicDepthTimer = 0;
+  private recordToastShown = false;
+  private cargoToastShown = false;
+  private startBestDepth = 0;
+  private coach = { active: false, shown: new Set<string>(), timer: 0, elapsed: 0 };
 
   constructor(
     private game: GameContext,
@@ -75,9 +83,11 @@ export class DiveScreen {
     $('hud-contract-label').textContent = this.contract.label;
     $('hud-contract-reward').textContent = `+$${this.contract.reward.toLocaleString()}`;
     this.endTransitionTimer = 0;
+    this.finished = false;
     this.currentStratumId = planet.strata[0].id;
     this.stratumBannerTimer = 0;
     $('stratum-banner').classList.remove('show');
+    this.resetCallouts(planet.id);
 
     // Configure Ambient Planet Vignette
     const vig = $('planet-ambient-vignette');
@@ -102,6 +112,9 @@ export class DiveScreen {
   }
 
   private finish(): void {
+    // The screen fade keeps frames running briefly, so settle the dive exactly once
+    if (this.finished) return;
+    this.finished = true;
     PortalSDK.gameplayStop();
     this.onFinished();
   }
@@ -130,7 +143,8 @@ export class DiveScreen {
   }
 
   private update(dt: number): void {
-    const feedback = this.feel.handle(this.pod.events, this.game.save.settings.screenShake);
+    const { screenShake, reducedMotion } = this.game.save.settings;
+    const feedback = this.feel.handle(this.pod.events, screenShake && !reducedMotion);
     this.pod.screenShake = Math.max(this.pod.screenShake, feedback.shake);
     if (feedback.haptic > 0) this.game.haptic(feedback.haptic);
     this.feel.update(dt, this.pod.x, this.pod.y);
@@ -143,6 +157,7 @@ export class DiveScreen {
     }
 
     if (this.pod.endReason) {
+      this.setFuelAlarmVisuals(100);
       this.game.particles.update(dt);
       this.endTransitionTimer += dt;
       if (this.endTransitionTimer >= 0.75) {
@@ -197,6 +212,128 @@ export class DiveScreen {
     }
 
     this.updateDiveHUD();
+    this.updateCallouts(dt);
+  }
+
+  private resetCallouts(planetId: number): void {
+    this.fuelAlarmTimer = 0;
+    this.toastTimer = 0;
+    this.musicDepthTimer = 0;
+    this.recordToastShown = false;
+    this.cargoToastShown = false;
+    this.startBestDepth = this.game.save.deepestByPlanet[planetId] ?? 0;
+    this.coach = { active: this.game.save.totalDives < 3, shown: new Set(), timer: 0, elapsed: 0 };
+    $('dive-toast').classList.remove('show');
+    $('coach-tip').classList.remove('show', 'urgent');
+    this.setFuelAlarmVisuals(100);
+  }
+
+  /** Low-fuel alarm, mid-dive toasts, first-dive tips and depth-driven music. */
+  private updateCallouts(dt: number): void {
+    const pod = this.pod;
+    const fuelPct = (pod.fuel / pod.maxFuel) * 100;
+
+    this.setFuelAlarmVisuals(fuelPct);
+    if (fuelPct <= 25) {
+      this.fuelAlarmTimer -= dt;
+      if (this.fuelAlarmTimer <= 0) {
+        const urgent = fuelPct <= 10;
+        this.game.sound.playFuelAlarm(urgent);
+        this.fuelAlarmTimer = urgent ? 0.6 : 1.3;
+      }
+    } else {
+      this.fuelAlarmTimer = 0;
+    }
+
+    if (!this.recordToastShown && this.startBestDepth >= 40 && pod.maxDepthReached > this.startBestDepth) {
+      this.recordToastShown = true;
+      this.showToast('NEW DEPTH RECORD', `PAST ${this.startBestDepth}m`, '#ffd54f');
+      this.game.sound.playContractComplete();
+    }
+    if (!this.cargoToastShown && pod.cargoUsed >= pod.maxCargo) {
+      this.cargoToastShown = true;
+      this.showToast('CARGO FULL', 'HOLD [SPACE] TO WINCH UP AND SELL', '#69f0ae');
+    }
+    if (this.toastTimer > 0) {
+      this.toastTimer -= dt;
+      if (this.toastTimer <= 0) $('dive-toast').classList.remove('show');
+    }
+
+    this.musicDepthTimer -= dt;
+    if (this.musicDepthTimer <= 0) {
+      this.musicDepthTimer = 0.5;
+      this.game.sound.setMusicDepth(pod.depthMeters / this.world.planet.maxDepth);
+    }
+
+    this.updateCoach(dt, fuelPct);
+  }
+
+  private setFuelAlarmVisuals(fuelPct: number): void {
+    const vig = $('low-fuel-vignette');
+    vig.classList.toggle('low', fuelPct <= 25 && fuelPct > 10);
+    vig.classList.toggle('critical', fuelPct <= 10);
+    $('btn-hold-extract').classList.toggle('urge', fuelPct <= 25);
+  }
+
+  private showToast(title: string, sub: string, color: string): void {
+    const toast = $('dive-toast');
+    toast.style.setProperty('--toast-color', color);
+    $('dive-toast-title').textContent = title;
+    $('dive-toast-sub').textContent = sub;
+    toast.classList.add('show');
+    this.toastTimer = 2.4;
+  }
+
+  /** Tips for the first few dives, each shown once when it becomes relevant. */
+  private updateCoach(dt: number, fuelPct: number): void {
+    const coach = this.coach;
+    if (!coach.active) return;
+    coach.elapsed += dt;
+
+    const tip = $('coach-tip');
+    if (coach.timer > 0) {
+      coach.timer -= dt;
+      if (coach.timer <= 0) tip.classList.remove('show', 'urgent');
+    }
+
+    const touch = window.matchMedia?.('(pointer: coarse)').matches;
+    const tips: { id: string; when: boolean; text: string; urgent?: boolean }[] = [
+      {
+        id: 'winch',
+        when: fuelPct <= 30,
+        urgent: true,
+        text: touch
+          ? 'Fuel is low! Hold the EXTRACT button to winch up. Running dry loses part of your cargo.'
+          : 'Fuel is low! Hold SPACE or the EXTRACT button to winch up. Running dry loses part of your cargo.',
+      },
+      {
+        id: 'contract',
+        when: coach.elapsed > 1.2,
+        text: 'Each dive comes with a CONTRACT at the top of the screen. Finish it for a bonus payout.',
+      },
+      {
+        id: 'ore',
+        when: this.pod.cargoUsed > 0 && this.pod.depthMeters >= 12,
+        text: 'Ore fills your cargo hold. It only turns into cash once you bring it back to the surface.',
+      },
+      {
+        id: 'cells',
+        when: fuelPct <= 60,
+        text: 'Green fuel cells refill your tank. Drill into them when you pass one.',
+      },
+    ];
+
+    for (const t of tips) {
+      if (!t.when || coach.shown.has(t.id)) continue;
+      // An urgent tip may replace a calm one; calm tips wait their turn
+      if (coach.timer > 0 && !t.urgent) continue;
+      coach.shown.add(t.id);
+      $('coach-text').textContent = t.text;
+      tip.classList.toggle('urgent', !!t.urgent);
+      tip.classList.add('show');
+      coach.timer = t.urgent ? 6 : 5;
+      break;
+    }
   }
 
   private checkContract(): void {

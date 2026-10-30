@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Core Diver — Planetary Mining Incremental</title>
+    <meta name="description" content="Steer a drill rig through layered planets, haul rare ore before your fuel runs dry, and shatter each planet's core." />
+    <meta name="theme-color" content="#070a12" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23070a12'/%3E%3Cpath d='M18 14h28v18L32 52 18 32z' fill='%23f5a623'/%3E%3Ccircle cx='32' cy='26' r='6' fill='%2300e5ff'/%3E%3C/svg%3E"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -14,6 +20,19 @@
   </head>
   <body>
     <div id="app" style="--planet-accent: #f5a623">
+      <!-- Boot splash: waits for sprites and fonts, then asks for a click so audio can start -->
+      <div id="boot-splash" class="boot-splash">
+        <div class="boot-inner">
+          <div id="boot-logo-slot" class="boot-logo-slot"></div>
+          <div class="boot-bar"><div class="boot-fill" id="boot-fill"></div></div>
+          <div class="boot-status tabular" id="boot-status">CALIBRATING DRILL ARRAY…</div>
+          <div class="boot-prompt" id="boot-prompt">CLICK OR PRESS ANY KEY</div>
+        </div>
+      </div>
+
+      <!-- Full-screen fade used between screens -->
+      <div id="screen-fade" class="screen-fade"></div>
+
       <!-- ====================================================
            SCREEN 1: TITLE SCREEN
            ==================================================== -->
@@ -62,6 +81,21 @@
 
         <!-- Ambient Planet Vignette Overlay (Cryo-Vex frost / Pyra-Void heat) -->
         <div id="planet-ambient-vignette" class="planet-ambient-vignette"></div>
+
+        <!-- Red edge pulse while fuel is low -->
+        <div id="low-fuel-vignette" class="low-fuel-vignette"></div>
+
+        <!-- Mid-dive callouts (new depth record, cargo full) -->
+        <div id="dive-toast" class="dive-toast">
+          <div class="dive-toast-title" id="dive-toast-title"></div>
+          <div class="dive-toast-sub" id="dive-toast-sub"></div>
+        </div>
+
+        <!-- First-dive coaching tips -->
+        <div id="coach-tip" class="coach-tip">
+          <span class="coach-tag">TIP</span>
+          <span class="coach-text" id="coach-text"></span>
+        </div>
 
         <!-- Slide-in Stratum Transition Banner (auto-hides after 2s) -->
         <div id="stratum-banner" class="stratum-banner">

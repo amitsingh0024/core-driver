@@ -38,6 +38,8 @@ export class SpriteAtlas {
   public beaconTile!: HTMLCanvasElement;
   public relicChestTile!: HTMLCanvasElement;
   public skillIcons: Map<SkillIconType, HTMLCanvasElement> = new Map();
+  /** Resolves once the PNG atlases are sliced, or once the procedural fallback is in use. */
+  public readonly ready: Promise<void>;
 
   constructor() {
     this.generateBlockTilesFallback();
@@ -45,7 +47,7 @@ export class SpriteAtlas {
     this.generateOreOverlaysFallback();
     this.generateSpecialTiles();
     this.generateSkillIcons();
-    this.loadTransparentPNGSheets();
+    this.ready = this.loadTransparentPNGSheets();
   }
 
   private createHDCanvas(w = HD_SIZE, h = HD_SIZE): [HTMLCanvasElement, CanvasRenderingContext2D] {

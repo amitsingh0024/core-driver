@@ -6,6 +6,10 @@ export interface GameSettings {
   screenShake: boolean;
   haptics: boolean;
   colorblindMode: boolean;
+  /** Mute button state, kept apart from the volume sliders so unmuting restores them. */
+  muted: boolean;
+  /** Fewer flashes, no shake and shorter transitions. */
+  reducedMotion: boolean;
   language: 'EN' | 'ES' | 'FR' | 'DE';
 }
 
@@ -18,6 +22,14 @@ export interface SaveState {
   deepestByPlanet: Record<number, number>;
   totalDives: number;
   settings: GameSettings;
+}
+
+function prefersReducedMotion(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
 }
 
 export function getDefaultSaveState(): SaveState {
@@ -35,6 +47,8 @@ export function getDefaultSaveState(): SaveState {
       screenShake: true,
       haptics: true,
       colorblindMode: false,
+      muted: false,
+      reducedMotion: prefersReducedMotion(),
       language: 'EN',
     },
   };

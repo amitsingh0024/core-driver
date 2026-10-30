@@ -15,6 +15,7 @@ export class Game {
   private ctx = new GameContext();
   private mode: ScreenMode = 'TITLE';
   private lastFrameTime = performance.now();
+  private transitioning = false;
 
   private settings = new SettingsForm(this.ctx);
   private title = new TitleScreen(this.ctx);
@@ -32,8 +33,65 @@ export class Game {
     this.bindNavigation();
     this.settings.render();
     this.ctx.applyPlanetAccent();
+    this.bindPolish();
     this.showScreen('TITLE');
     requestAnimationFrame((t) => this.loop(t));
+    void this.boot();
+  }
+
+  /** Holds the splash until sprites and fonts are in, then waits for a gesture so audio can start. */
+  private async boot(): Promise<void> {
+    const splash = $('boot-splash');
+    const fill = $('boot-fill');
+    const status = $('boot-status');
+    requestAnimationFrame(() => (fill.style.width = '35%'));
+
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, 4000));
+    const fonts = document.fonts?.ready.then(() => undefined) ?? Promise.resolve();
+    void fonts.then(() => (fill.style.width = '70%'));
+    await Promise.race([Promise.all([this.ctx.atlas.ready, fonts]), timeout]);
+
+    fill.style.width = '100%';
+    status.textContent = 'RIG ONLINE';
+    splash.classList.add('ready');
+
+    const begin = () => {
+      window.removeEventListener('keydown', begin);
+      splash.removeEventListener('pointerdown', begin);
+      this.ctx.sound.unlock();
+      this.ctx.sound.playWhoosh(false);
+      splash.classList.add('done');
+    };
+    window.addEventListener('keydown', begin);
+    splash.addEventListener('pointerdown', begin);
+  }
+
+  /** Interface sounds, audio unlock and auto-pause when the tab loses focus. */
+  private bindPolish(): void {
+    const logoSlot = document.getElementById('boot-logo-slot');
+    if (logoSlot) logoSlot.innerHTML = CORE_DIVER_LOGO_SVG;
+
+    document.addEventListener('pointerdown', () => this.ctx.sound.unlock(), { capture: true });
+    document.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('button');
+      // The winch button has its own audio; buying plays the upgrade chime
+      if (btn && btn.id !== 'btn-hold-extract' && !btn.disabled) this.ctx.sound.playUiClick();
+    });
+    document.addEventListener('pointerover', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const btn = (e.target as HTMLElement).closest('button');
+      const from = (e.relatedTarget as HTMLElement | null)?.closest('button');
+      if (btn && btn !== from && !btn.disabled) this.ctx.sound.playUiHover();
+    });
+
+    const autoPause = () => {
+      if (this.mode === 'DIVE' && !this.dive.pod.endReason && !this.dive.isPaused) this.dive.setPaused(true);
+    };
+    document.addEventListener('visibilitychange', () => {
+      this.ctx.sound.suspend(document.hidden);
+      if (document.hidden) autoPause();
+    });
+    window.addEventListener('blur', autoPause);
   }
 
   private injectStaticSVGs(): void {
@@ -47,22 +105,40 @@ export class Game {
 
   private bindNavigation(): void {
     $('btn-title-play').addEventListener('click', () => this.startDive());
-    $('btn-title-hangar').addEventListener('click', () => this.showScreen('HANGAR'));
+    $('btn-title-hangar').addEventListener('click', () => this.transitionTo('HANGAR'));
     $('btn-title-settings').addEventListener('click', () => {
-      this.showScreen('HANGAR');
-      this.hangar.switchTab('settings');
+      this.transitionTo('HANGAR', () => this.hangar.switchTab('settings'));
     });
     $('btn-title-credits').addEventListener('click', () => $('credits-modal').classList.remove('hidden'));
     $('btn-close-credits').addEventListener('click', () => $('credits-modal').classList.add('hidden'));
 
     $('btn-results-hangar').addEventListener('click', () => {
-      this.showScreen('HANGAR');
-      this.hangar.switchTab('grid');
+      this.transitionTo('HANGAR', () => this.hangar.switchTab('grid'));
     });
     $('btn-results-redive').addEventListener('click', () => this.startDive());
 
-    $('btn-back-title').addEventListener('click', () => this.showScreen('TITLE'));
+    $('btn-back-title').addEventListener('click', () => this.transitionTo('TITLE'));
     $('btn-launch-dive').addEventListener('click', () => this.startDive());
+  }
+
+  /** Fades to black, swaps screens (running `swap` while hidden), then fades back in. */
+  private transitionTo(next: ScreenMode, swap?: () => void, mustRun = false): void {
+    if (this.transitioning) {
+      // Button double-clicks are dropped; game-driven transitions wait their turn
+      if (mustRun) window.setTimeout(() => this.transitionTo(next, swap, true), 80);
+      return;
+    }
+    this.transitioning = true;
+    const fade = $('screen-fade');
+    const ms = this.ctx.save.settings.reducedMotion ? 60 : 230;
+    fade.style.transitionDuration = `${ms}ms`;
+    fade.classList.add('on');
+    window.setTimeout(() => {
+      swap?.();
+      this.showScreen(next);
+      fade.classList.remove('on');
+      this.transitioning = false;
+    }, ms);
   }
 
   private showScreen(next: ScreenMode): void {
@@ -75,11 +151,12 @@ export class Game {
 
     if (next === 'TITLE') this.title.onShow();
     else if (next === 'HANGAR') this.hangar.refresh();
+    this.ctx.sound.setMusicMood(next === 'DIVE' ? 'dive' : 'menu', this.ctx.planet().id);
   }
 
   private startDive(): void {
-    this.dive.start();
-    this.showScreen('DIVE');
+    this.ctx.sound.playWhoosh(true);
+    this.transitionTo('DIVE', () => this.dive.start());
   }
 
   private finishDive(): void {
@@ -101,8 +178,7 @@ export class Game {
       this.ctx.save
     );
     this.ctx.persist();
-    this.results.show(payout, planet);
-    this.showScreen('RESULTS');
+    this.transitionTo('RESULTS', () => this.results.show(payout, planet), true);
   }
 
   private loop(now: number): void {

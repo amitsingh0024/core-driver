@@ -2,14 +2,15 @@ import { GameContext } from '../core/GameContext';
 import { SVG_ICONS } from '../ui/svgIcons';
 import { $ } from '../ui/dom';
 
-type ToggleKey = 'screenShake' | 'colorblindMode' | 'haptics';
+type ToggleKey = 'screenShake' | 'colorblindMode' | 'haptics' | 'reducedMotion';
+type SliderKey = 'sfxVolume' | 'musicVolume';
 
 /** Renders the settings form into both the hangar Settings tab and the pause modal. */
 export class SettingsForm {
   constructor(private game: GameContext) {
     $('btn-mute').addEventListener('click', () => {
       const s = this.game.save.settings;
-      s.sfxVolume = s.sfxVolume > 0 ? 0 : 80;
+      s.muted = !s.muted;
       this.game.persist();
       this.applyToRuntime();
       this.render();
@@ -18,9 +19,11 @@ export class SettingsForm {
   }
 
   public applyToRuntime(): void {
-    const vol = this.game.save.settings.sfxVolume;
-    this.game.sound.muted = vol <= 0;
-    this.game.sound.setVolume(vol / 100);
+    const s = this.game.save.settings;
+    this.game.sound.setMuted(s.muted);
+    this.game.sound.setVolume(s.sfxVolume / 100);
+    this.game.sound.setMusicVolume(s.musicVolume / 100);
+    document.body.classList.toggle('reduced-motion', s.reducedMotion);
     const slot = document.getElementById('mute-icon-slot');
     if (slot) slot.innerHTML = this.game.sound.muted ? SVG_ICONS.volumeOff : SVG_ICONS.volumeOn;
   }
@@ -43,6 +46,13 @@ export class SettingsForm {
         </div>
         <div class="setting-row">
           <div class="setting-label-group">
+            <span class="setting-title">Music Volume</span>
+            <span class="setting-sub">Ambient score that darkens as you dive deeper</span>
+          </div>
+          <input type="range" min="0" max="100" value="${s.musicVolume}" data-setting="musicVolume" />
+        </div>
+        <div class="setting-row">
+          <div class="setting-label-group">
             <span class="setting-title">Screen Shake</span>
             <span class="setting-sub">Camera shake and hit-stop on hard rock &amp; Core shatter</span>
           </div>
@@ -62,11 +72,18 @@ export class SettingsForm {
           </div>
           ${toggle('haptics')}
         </div>
+        <div class="setting-row">
+          <div class="setting-label-group">
+            <span class="setting-title">Reduced Motion</span>
+            <span class="setting-sub">Turns off shake and flashes, and shortens screen transitions</span>
+          </div>
+          ${toggle('reducedMotion')}
+        </div>
       `;
 
       container.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((inp) => {
         inp.addEventListener('input', () => {
-          this.game.save.settings.sfxVolume = Number(inp.value);
+          this.game.save.settings[inp.dataset.setting as SliderKey] = Number(inp.value);
           this.applyToRuntime();
           this.game.persist();
         });
@@ -76,6 +93,7 @@ export class SettingsForm {
           const key = btn.dataset.toggle as ToggleKey;
           s[key] = !s[key];
           this.game.persist();
+          this.applyToRuntime();
           this.render();
         });
       });
