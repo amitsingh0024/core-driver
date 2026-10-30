@@ -556,7 +556,7 @@ export class DiveRenderer {
       ctx.font = '700 11px "Chakra Petch", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffab00';
-      ctx.fillText('DENSE ROCK — UPGRADE DRILL IN DEEP GRID!', podScreenX, podScreenY - 28);
+      ctx.fillText('DENSE ROCK — UPGRADE YOUR DRILL!', podScreenX, podScreenY - 28);
     }
 
     // 9. Touch / Mouse Virtual Stick & Steering Drag Ring Indicator (Page 12)

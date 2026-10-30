@@ -1,9 +1,9 @@
-import { PLANETS } from '../../config/planets';
 import {
   SKILL_NODES,
   SKILL_NODE_MAP,
   SkillBranch,
   SkillNodeConfig,
+  PLANET_NAMES,
   evaluateSkillNode,
 } from '../../config/skillTree';
 import { GameContext } from '../../core/GameContext';
@@ -18,7 +18,7 @@ import { GATED_TABS, applyUiLocks, isFirstUpgradePending, isNew, isUnlocked, mar
 
 export type HangarTab = 'grid' | 'garage' | 'planets' | 'codex' | 'settings';
 
-/** Hangar hub: header, tab rail (tabs unlock as the player progresses), Deep Grid skill tree with its inspector, and the other tabs. */
+/** Hangar hub: header, tab rail (tabs unlock as the player progresses), the four upgrade tracks with their inspector, and the other tabs. */
 export class HangarScreen {
   public activeTab: HangarTab = 'grid';
   private skillTreeView: SkillTreeView;
@@ -84,13 +84,13 @@ export class HangarScreen {
     this.refresh();
     if (!isSecondTap) return;
     const save = this.game.save;
-    const ev = evaluateSkillNode(node, save.ownedSkills, save.highestUnlockedPlanet, save.cash);
+    const ev = evaluateSkillNode(node, save.ownedSkills, save.highestUnlockedPlanet, save.cash, save.deepestByPlanet);
     if (ev.state === 'AVAILABLE' && ev.canAfford) this.tryPurchaseNode(node);
   }
 
   private tryPurchaseNode(node: SkillNodeConfig): void {
     const save = this.game.save;
-    const ev = evaluateSkillNode(node, save.ownedSkills, save.highestUnlockedPlanet, save.cash);
+    const ev = evaluateSkillNode(node, save.ownedSkills, save.highestUnlockedPlanet, save.cash, save.deepestByPlanet);
     if (ev.state !== 'AVAILABLE' || !ev.canAfford) return;
 
     save.cash -= ev.nextCost;
@@ -122,20 +122,15 @@ export class HangarScreen {
   }
 
   private renderInspector(): void {
-    const node = SKILL_NODE_MAP[this.skillTreeView.selectedNodeId] ?? SKILL_NODES[1];
-    const ev = evaluateSkillNode(
-      node,
-      this.game.save.ownedSkills,
-      this.game.save.highestUnlockedPlanet,
-      this.game.save.cash
-    );
+    const node = SKILL_NODE_MAP[this.skillTreeView.selectedNodeId] ?? SKILL_NODES[0];
+    const ev = evaluateSkillNode(node, this.game.save.ownedSkills, this.game.save.highestUnlockedPlanet, this.game.save.cash, this.game.save.deepestByPlanet);
     const branchMeta = BRANCH_COLORS[node.branch];
 
     const branchEl = document.getElementById('insp-branch')!;
-    branchEl.textContent = `${branchMeta.label} (${branchMeta.shapeName.toUpperCase()})`;
+    branchEl.textContent = `${branchMeta.label} TRACK`;
     branchEl.style.color = branchMeta.main;
 
-    document.getElementById('insp-planet-tag')!.textContent = `PLANET ${node.minPlanet} TIER`;
+    document.getElementById('insp-planet-tag')!.textContent = `${PLANET_NAMES[node.minPlanet].toUpperCase()} · TIER ${node.tier}`;
     document.getElementById('insp-title')!.textContent = node.name;
     document.getElementById('insp-level')!.textContent =
       ev.state === 'MAXED'
@@ -156,46 +151,17 @@ export class HangarScreen {
     const locksBox = document.getElementById('insp-locks')!;
     locksBox.innerHTML = '';
 
-    if (node.minPlanet > 1) {
-      const met = this.game.save.highestUnlockedPlanet >= node.minPlanet;
+    for (const reason of ev.lockReasons) {
       const div = document.createElement('div');
-      div.className = `lock-pill ${met ? 'met' : ''}`;
-      div.textContent = `${met ? '✓' : 'LOCKED:'} Unlock Planet ${node.minPlanet} (${
-        PLANETS[node.minPlanet - 1]?.name
-      })`;
-      locksBox.appendChild(div);
-    }
-
-    if (node.requiresSkill) {
-      const reqNode = SKILL_NODE_MAP[node.requiresSkill.nodeId];
-      const haveLv = this.game.save.ownedSkills[node.requiresSkill.nodeId] ?? 0;
-      const met = haveLv >= node.requiresSkill.minLevel;
-      const div = document.createElement('div');
-      div.className = `lock-pill ${met ? 'met' : ''}`;
-      div.textContent = `${met ? '✓' : 'LOCKED:'} Requires ${reqNode?.name} Lv ${
-        node.requiresSkill.minLevel
-      } (${haveLv}/${node.requiresSkill.minLevel})`;
-      locksBox.appendChild(div);
-    }
-
-    if (node.requiresNodesAll && node.requiresNodesAll.length > 0) {
-      const ownedCount = node.requiresNodesAll.filter(
-        (id) => (this.game.save.ownedSkills[id] ?? 0) >= 1
-      ).length;
-      const met = ownedCount >= node.requiresNodesAll.length;
-      const names = node.requiresNodesAll.map((id) => SKILL_NODE_MAP[id]?.name ?? id).join(' + ');
-      const div = document.createElement('div');
-      div.className = `lock-pill ${met ? 'met' : ''}`;
-      div.textContent = `${met ? '✓' : 'LOCKED'} (${ownedCount}/${
-        node.requiresNodesAll.length
-      }): Buy ${names}`;
+      div.className = 'lock-pill';
+      div.textContent = `LOCKED: ${reason}`;
       locksBox.appendChild(div);
     }
 
     const buyBtn = document.getElementById('btn-buy-node') as HTMLButtonElement;
     if (ev.state === 'MAXED') {
       buyBtn.disabled = true;
-      buyBtn.textContent = 'NODE MAXED OUT';
+      buyBtn.textContent = 'MAXED OUT';
     } else if (ev.state === 'LOCKED_VISIBLE') {
       buyBtn.disabled = true;
       buyBtn.textContent = `LOCKED • $${ev.nextCost.toLocaleString()}`;
@@ -204,7 +170,7 @@ export class HangarScreen {
       buyBtn.textContent = `NEED $${ev.nextCost.toLocaleString()} CREDITS`;
     } else {
       buyBtn.disabled = false;
-      buyBtn.textContent = `UPGRADE NODE • $${ev.nextCost.toLocaleString()}`;
+      buyBtn.textContent = `UPGRADE • $${ev.nextCost.toLocaleString()}`;
     }
   }
 
@@ -232,7 +198,7 @@ export class HangarScreen {
     const canAfford = cheapestAvailableCost(save) <= save.cash;
     const firstBuy = isFirstUpgradePending(save);
     let hint = '';
-    if (firstBuy && canAfford) hint = 'Tap a glowing node, then UPGRADE, to buy your first upgrade.';
+    if (firstBuy && canAfford) hint = 'Tap a glowing card, then UPGRADE, to buy your first upgrade.';
     else if (save.totalDives <= 2 && !canAfford) hint = 'Launch a dive to earn credits for your next upgrade.';
 
     const coach = $('hangar-coach');

@@ -1,80 +1,66 @@
 import { fitCanvasToDisplay } from '../render/podView';
 import {
   SKILL_NODES,
-  SKILL_NODE_MAP,
   SkillNodeConfig,
   SkillBranch,
+  UPGRADE_TRACKS,
+  UpgradeTrack,
   evaluateSkillNode,
+  isTrackOpen,
   NodeEvaluation,
 } from '../config/skillTree';
+import { nextGoal } from '../config/milestones';
 import { SpriteAtlas } from '../assets/spriteGenerator';
 import { SaveState } from '../sdk/PortalSDK';
 
-export const BRANCH_COLORS: Record<
-  SkillBranch,
-  { main: string; glow: string; bg: string; label: string; shapeName: string }
-> = {
-  core: {
-    main: '#f5a623',
-    glow: 'rgba(245, 166, 35, 0.45)',
-    bg: '#2b1f0d',
-    label: 'CORE RIG',
-    shapeName: 'Octagon',
-  },
-  drill: {
-    main: '#ff7043',
-    glow: 'rgba(255, 112, 67, 0.45)',
-    bg: '#2e1610',
-    label: 'EXCAVATION & DRILL',
-    shapeName: 'Shield',
-  },
-  fuel: {
-    main: '#00e676',
-    glow: 'rgba(0, 230, 118, 0.45)',
-    bg: '#0c2919',
-    label: 'FUEL & THERMAL',
-    shapeName: 'Hexagon',
-  },
-  cargo: {
-    main: '#ab47bc',
-    glow: 'rgba(171, 71, 188, 0.45)',
-    bg: '#241029',
-    label: 'CARGO & REFINERY',
-    shapeName: 'Beveled Crate',
-  },
-  utility: {
-    main: '#29b6f6',
-    glow: 'rgba(41, 182, 246, 0.45)',
-    bg: '#0d2230',
-    label: 'THRUSTERS & RADAR',
-    shapeName: 'Diamond',
-  },
-  drone: {
-    main: '#00e5ff',
-    glow: 'rgba(0, 229, 255, 0.5)',
-    bg: '#08262b',
-    label: 'AUTONOMOUS DRONES',
-    shapeName: 'Orbital Ring',
-  },
+export const BRANCH_COLORS: Record<SkillBranch, { main: string; glow: string; bg: string; label: string }> = {
+  core: { main: '#f5a623', glow: 'rgba(245, 166, 35, 0.45)', bg: '#2b1f0d', label: 'CORE RIG' },
+  drill: { main: '#ff7043', glow: 'rgba(255, 112, 67, 0.45)', bg: '#2e1610', label: 'DRILL' },
+  fuel: { main: '#00e676', glow: 'rgba(0, 230, 118, 0.45)', bg: '#0c2919', label: 'FUEL' },
+  cargo: { main: '#ab47bc', glow: 'rgba(171, 71, 188, 0.45)', bg: '#241029', label: 'CARGO' },
+  utility: { main: '#29b6f6', glow: 'rgba(41, 182, 246, 0.45)', bg: '#0d2230', label: 'SYSTEMS' },
+  drone: { main: '#00e5ff', glow: 'rgba(0, 229, 255, 0.5)', bg: '#08262b', label: 'DRONES' },
 };
 
+const PAD = 14;
+const GAP = 12;
+const GOAL_H = 46;
+const HEAD_H = 46;
+const CARD_H = 62;
+const MAXED_H = 34;
+const CARD_GAP = 8;
+/** Room under the last card for the overlay controls. */
+const BOTTOM_ROOM = 64;
+
+interface CardRect {
+  node: SkillNodeConfig;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * The upgrade screen: four track columns (Fuel, Cargo, Drill, Systems), each a short ladder of
+ * cards. A track appears once its depth is reached; cards waiting on a depth show "Reach N m".
+ * On narrow screens the tracks wrap into two columns. Drag or scroll to move up and down.
+ */
 export class SkillTreeView {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private atlas: SpriteAtlas;
-  private panX = 0;
-  private panY = 30;
-  private zoom = 1.0;
+  private scrollY = 0;
+  private contentH = 0;
   private isDragging = false;
-  private dragStartX = 0;
   private dragStartY = 0;
+  private dragStartScroll = 0;
   private dragMoved = false;
+  private cards: CardRect[] = [];
 
-  public selectedNodeId = 'drill_torque_1';
+  public selectedNodeId = 'fuel_tank';
   public hoveredNodeId: string | null = null;
   private celebrations = new Map<string, number>();
   private animTime = 0;
-  private nodeSpacing = 116;
 
   private onSelectOrBuyCallback: (node: SkillNodeConfig, isSecondTap: boolean) => void;
 
@@ -90,29 +76,26 @@ export class SkillTreeView {
     this.bindEvents();
   }
 
-  /** Plays a short burst ring on a node that was just bought. */
+  /** Plays a short flash on a card that was just bought. */
   public celebrate(nodeId: string): void {
     this.celebrations.set(nodeId, this.animTime);
   }
 
   public resetCamera(): void {
-    this.panX = 0;
-    this.panY = 40;
-    this.zoom = 1.0;
+    this.scrollY = 0;
   }
 
+  /** Selects the first buyable card in a track and scrolls to it. */
   public focusBranch(branch: SkillBranch, save: SaveState): SkillNodeConfig | null {
-    const candidates = SKILL_NODES.filter((n) => {
-      if (n.branch !== branch) return false;
-      const ev = evaluateSkillNode(n, save.ownedSkills, save.highestUnlockedPlanet, save.cash);
-      return ev.state !== 'HIDDEN';
-    });
-    const target = candidates[0] ?? SKILL_NODES.find((n) => n.branch === branch) ?? null;
+    const inTrack = SKILL_NODES.filter((n) => n.branch === branch);
+    const evalOf = (n: SkillNodeConfig) =>
+      evaluateSkillNode(n, save.ownedSkills, save.highestUnlockedPlanet, save.cash, save.deepestByPlanet);
+    const target =
+      inTrack.find((n) => evalOf(n).state === 'AVAILABLE') ?? inTrack.find((n) => evalOf(n).state !== 'HIDDEN') ?? null;
     if (target) {
       this.selectedNodeId = target.id;
-      const pos = this.getNodeWorldPos(target);
-      this.panX = -pos.x * this.zoom;
-      this.panY = -pos.y * this.zoom;
+      const rect = this.cards.find((c) => c.node.id === target.id);
+      if (rect) this.scrollY = Math.max(0, rect.y - GOAL_H - HEAD_H - PAD);
     }
     return target;
   }
@@ -121,44 +104,35 @@ export class SkillTreeView {
     this.canvas.addEventListener('pointerdown', (e) => {
       this.isDragging = true;
       this.dragMoved = false;
-      this.dragStartX = e.clientX - this.panX;
-      this.dragStartY = e.clientY - this.panY;
+      this.dragStartY = e.clientY;
+      this.dragStartScroll = this.scrollY;
     });
 
     window.addEventListener('pointermove', (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
-
       if (this.isDragging) {
-        const nx = e.clientX - this.dragStartX;
-        const ny = e.clientY - this.dragStartY;
-        if (Math.hypot(nx - this.panX, ny - this.panY) > 6) {
-          this.dragMoved = true;
-        }
-        this.panX = nx;
-        this.panY = ny;
+        const dy = e.clientY - this.dragStartY;
+        if (Math.abs(dy) > 6) this.dragMoved = true;
+        this.scrollY = this.clampScroll(this.dragStartScroll - dy);
       } else if (mx >= 0 && my >= 0 && mx <= rect.width && my <= rect.height) {
-        const hit = this.findNodeAtScreenPos(mx, my);
+        const hit = this.findCardAt(mx, my);
         this.hoveredNodeId = hit ? hit.id : null;
-        this.canvas.style.cursor = hit ? 'pointer' : 'grab';
+        this.canvas.style.cursor = hit ? 'pointer' : 'default';
       }
     });
 
     window.addEventListener('pointerup', (e) => {
       if (!this.isDragging) return;
       this.isDragging = false;
-
-      if (!this.dragMoved) {
-        const rect = this.canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const hit = this.findNodeAtScreenPos(mx, my);
-        if (hit) {
-          const isSecondTap = this.selectedNodeId === hit.id;
-          this.selectedNodeId = hit.id;
-          this.onSelectOrBuyCallback(hit, isSecondTap);
-        }
+      if (this.dragMoved) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const hit = this.findCardAt(e.clientX - rect.left, e.clientY - rect.top);
+      if (hit) {
+        const isSecondTap = this.selectedNodeId === hit.id;
+        this.selectedNodeId = hit.id;
+        this.onSelectOrBuyCallback(hit, isSecondTap);
       }
     });
 
@@ -166,447 +140,234 @@ export class SkillTreeView {
       'wheel',
       (e) => {
         e.preventDefault();
-        const delta = e.deltaY < 0 ? 1.1 : 0.9;
-        this.zoom = Math.max(0.55, Math.min(1.65, this.zoom * delta));
+        this.scrollY = this.clampScroll(this.scrollY + e.deltaY);
       },
       { passive: false }
     );
   }
 
-  private getNodeWorldPos(node: SkillNodeConfig): { x: number; y: number } {
-    return {
-      x: node.gx * this.nodeSpacing,
-      y: node.gy * this.nodeSpacing,
-    };
+  private clampScroll(y: number): number {
+    return Math.max(0, Math.min(Math.max(0, this.contentH - this.canvas.clientHeight), y));
   }
 
-  private screenToWorld(sx: number, sy: number): { wx: number; wy: number } {
-    const cx = this.canvas.clientWidth * 0.5 + this.panX;
-    const cy = this.canvas.clientHeight * 0.5 + this.panY;
-    return {
-      wx: (sx - cx) / this.zoom,
-      wy: (sy - cy) / this.zoom,
-    };
-  }
-
-  private findNodeAtScreenPos(sx: number, sy: number): SkillNodeConfig | null {
-    const { wx, wy } = this.screenToWorld(sx, sy);
-    for (const node of SKILL_NODES) {
-      const pos = this.getNodeWorldPos(node);
-      if (Math.hypot(wx - pos.x, wy - pos.y) <= 34) {
-        return node;
-      }
+  private findCardAt(sx: number, sy: number): SkillNodeConfig | null {
+    const y = sy + this.scrollY;
+    for (const c of this.cards) {
+      if (sx >= c.x && sx <= c.x + c.w && y >= c.y && y <= c.y + c.h) return c.node;
     }
     return null;
-  }
-
-  /**
-   * Traces the branch-specific frame shape (6 distinct silhouettes for colorblind readability)
-   */
-  private traceBranchShape(ctx: CanvasRenderingContext2D, branch: SkillBranch, r: number): void {
-    ctx.beginPath();
-    switch (branch) {
-      case 'core': {
-        // 8-sided industrial octagon
-        for (let i = 0; i < 8; i++) {
-          const a = (i * Math.PI) / 4 + Math.PI / 8;
-          const px = Math.cos(a) * r;
-          const py = Math.sin(a) * r;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        break;
-      }
-      case 'drill': {
-        // Pointed Excavation Shield / Chevron
-        ctx.moveTo(-r * 0.85, -r * 0.82);
-        ctx.lineTo(r * 0.85, -r * 0.82);
-        ctx.lineTo(r * 0.95, r * 0.15);
-        ctx.lineTo(0, r * 1.08);
-        ctx.lineTo(-r * 0.95, r * 0.15);
-        ctx.closePath();
-        break;
-      }
-      case 'fuel': {
-        // Flat-top Hexagon
-        for (let i = 0; i < 6; i++) {
-          const a = (i * Math.PI) / 3;
-          const px = Math.cos(a) * r;
-          const py = Math.sin(a) * r;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        break;
-      }
-      case 'cargo': {
-        // Chamfered Cargo Crate Square
-        const c = r * 0.88;
-        const b = r * 0.34;
-        ctx.moveTo(-c + b, -c);
-        ctx.lineTo(c - b, -c);
-        ctx.lineTo(c, -c + b);
-        ctx.lineTo(c, c - b);
-        ctx.lineTo(c - b, c);
-        ctx.lineTo(-c + b, c);
-        ctx.lineTo(-c, c - b);
-        ctx.lineTo(-c, -c + b);
-        ctx.closePath();
-        break;
-      }
-      case 'utility': {
-        // Radar Diamond
-        const d = r * 1.08;
-        ctx.moveTo(0, -d);
-        ctx.lineTo(d, 0);
-        ctx.lineTo(0, d);
-        ctx.lineTo(-d, 0);
-        ctx.closePath();
-        break;
-      }
-      case 'drone':
-      default: {
-        // Orbital Tech Circle
-        ctx.arc(0, 0, r, 0, Math.PI * 2);
-        break;
-      }
-    }
   }
 
   public render(dt: number, save: SaveState): void {
     this.animTime += dt;
     const { w, h, dpr } = fitCanvasToDisplay(this.canvas);
-
     const ctx = this.ctx;
     ctx.save();
     ctx.scale(dpr, dpr);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
 
-    // 1. Deep Grid Background: a blueprint sheet, lit from the middle
-    const sheet = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.75);
+    const sheet = ctx.createLinearGradient(0, 0, 0, h);
     sheet.addColorStop(0, '#1a0b3a');
     sheet.addColorStop(1, '#07021a');
     ctx.fillStyle = sheet;
     ctx.fillRect(0, 0, w, h);
 
-    const cx = w * 0.5 + this.panX;
-    const cy = h * 0.5 + this.panY;
-
-    // Blueprint grid: fine minor lines with a heavier major line every fourth
-    const drawGrid = (step: number, color: string, width: number) => {
-      const ox = ((cx % step) + step) % step;
-      const oy = ((cy % step) + step) % step;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.beginPath();
-      for (let x = ox; x < w; x += step) {
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
-      }
-      for (let y = oy; y < h; y += step) {
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-      }
-      ctx.stroke();
-    };
-    drawGrid(29 * this.zoom, 'rgba(185, 103, 255, 0.08)', 1);
-    drawGrid(116 * this.zoom, 'rgba(255, 46, 136, 0.22)', 1.5);
-
-    ctx.translate(cx, cy);
-    ctx.scale(this.zoom, this.zoom);
-
-    // Evaluate all nodes first
     const evals = new Map<string, NodeEvaluation>();
     for (const node of SKILL_NODES) {
       evals.set(
         node.id,
-        evaluateSkillNode(node, save.ownedSkills, save.highestUnlockedPlanet, save.cash)
+        evaluateSkillNode(node, save.ownedSkills, save.highestUnlockedPlanet, save.cash, save.deepestByPlanet)
       );
     }
 
-    // 2. Draw Drifting Fog-of-War Clouds over Unrevealed Nodes
-    for (const node of SKILL_NODES) {
-      const ev = evals.get(node.id)!;
-      if (ev.state !== 'HIDDEN') continue;
-
-      const pos = this.getNodeWorldPos(node);
-      const driftX = Math.sin(this.animTime * 0.6 + node.gx * 1.3 + node.gy) * 8;
-      const driftY = Math.cos(this.animTime * 0.5 + node.gy * 1.1) * 6;
-
-      const fogGrad = ctx.createRadialGradient(
-        pos.x + driftX,
-        pos.y + driftY,
-        8,
-        pos.x + driftX,
-        pos.y + driftY,
-        74
-      );
-      fogGrad.addColorStop(0, 'rgba(7, 2, 26, 0.85)');
-      fogGrad.addColorStop(0.6, 'rgba(7, 2, 26, 0.45)');
-      fogGrad.addColorStop(1, 'rgba(7, 2, 26, 0)');
-      ctx.fillStyle = fogGrad;
-      ctx.beginPath();
-      ctx.arc(pos.x + driftX, pos.y + driftY, 74, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Check if any parent is revealed (so this hidden node is on the fog frontier)
-      const isFrontier = node.revealFrom.some((pid) => {
-        const pev = evals.get(pid);
-        return pev && pev.state !== 'HIDDEN';
-      });
-      if (isFrontier) {
-        const pPos = this.getNodeWorldPos(SKILL_NODE_MAP[node.revealFrom[0]]);
-        ctx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 6]);
-        ctx.beginPath();
-        ctx.moveTo(pPos.x, pPos.y);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = 'rgba(16, 8, 38, 0.9)';
-        ctx.strokeStyle = 'rgba(0, 240, 255, 0.55)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 18, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = 'rgba(0, 240, 255, 0.75)';
-        ctx.font = '700 14px "Orbitron", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('?', pos.x, pos.y + 5);
+    // Layout: four columns on wide screens, two on phones
+    const cols = w >= 560 ? 4 : 2;
+    const colW = (w - PAD * 2 - GAP * (cols - 1)) / cols;
+    const colBottoms = new Array(cols).fill(GOAL_H + PAD);
+    this.cards = [];
+    const blocks: { track: UpgradeTrack; x: number; y: number; open: boolean; nodes: SkillNodeConfig[] }[] = [];
+    UPGRADE_TRACKS.forEach((track, i) => {
+      const col = i % cols;
+      const x = PAD + col * (colW + GAP);
+      const y = colBottoms[col];
+      const open = isTrackOpen(track, save.highestUnlockedPlanet, save.deepestByPlanet);
+      const nodes = open
+        ? SKILL_NODES.filter((n) => n.branch === track.branch && evals.get(n.id)!.state !== 'HIDDEN')
+        : [];
+      let cy = y + HEAD_H + CARD_GAP;
+      for (const node of nodes) {
+        const ch = evals.get(node.id)!.state === 'MAXED' ? MAXED_H : CARD_H;
+        this.cards.push({ node, x, y: cy, w: colW, h: ch });
+        cy += ch + CARD_GAP;
       }
-    }
+      blocks.push({ track, x, y, open, nodes });
+      colBottoms[col] = cy + GAP;
+    });
+    this.contentH = Math.max(...colBottoms) + BOTTOM_ROOM;
+    this.scrollY = this.clampScroll(this.scrollY);
 
-    // 3. Draw Connection Lines ONLY to Revealed Nodes (with animated pulse on owned paths)
-    for (const node of SKILL_NODES) {
-      const ev = evals.get(node.id)!;
-      if (ev.state === 'HIDDEN') continue;
-
-      const toPos = this.getNodeWorldPos(node);
-      const bCol = BRANCH_COLORS[node.branch];
-
-      const parentIds = new Set<string>([
-        ...node.revealFrom,
-        ...(node.requiresNodesAll ?? []),
-      ]);
-
-      for (const pid of parentIds) {
-        const parent = SKILL_NODE_MAP[pid];
-        const pev = evals.get(pid);
-        if (!parent || !pev || pev.state === 'HIDDEN') continue;
-
-        const fromPos = this.getNodeWorldPos(parent);
-        const parentOwned = pev.level >= 1;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(fromPos.x, fromPos.y);
-        ctx.lineTo(toPos.x, toPos.y);
-
-        if (ev.level > 0 && parentOwned) {
-          ctx.strokeStyle = bCol.main;
-          ctx.lineWidth = 4;
-          ctx.stroke();
-
-          // Animated glowing energy pulse traveling along owned wire
-          const t = (this.animTime * 0.75 + (node.gx + node.gy) * 0.17) % 1;
-          const px = fromPos.x + (toPos.x - fromPos.x) * t;
-          const py = fromPos.y + (toPos.y - fromPos.y) * t;
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath();
-          ctx.arc(px, py, 3.2, 0, Math.PI * 2);
-          ctx.fill();
-        } else if (ev.state === 'AVAILABLE' && parentOwned) {
-          ctx.strokeStyle = ev.canAfford ? bCol.main : 'rgba(144, 164, 174, 0.65)';
-          ctx.lineWidth = 2.8;
-          ctx.stroke();
-        } else {
-          ctx.strokeStyle = 'rgba(120, 144, 156, 0.35)';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([6, 5]);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-    }
-
-    // 4. Draw Revealed Nodes with Branch-Specific Frame Shapes
-    for (const node of SKILL_NODES) {
-      const ev = evals.get(node.id)!;
-      if (ev.state === 'HIDDEN') continue;
-
-      const pos = this.getNodeWorldPos(node);
-      const bCol = BRANCH_COLORS[node.branch];
-      const isSelected = this.selectedNodeId === node.id;
-      const isHovered = this.hoveredNodeId === node.id;
-      const radius = node.id === 'starter_pod' ? 32 : 28;
-
-      ctx.save();
-      ctx.translate(pos.x, pos.y);
-
-      // Pulse halo for affordable available nodes or selected node
-      if (isSelected || isHovered || (ev.state === 'AVAILABLE' && ev.canAfford)) {
-        const pulse = 1 + Math.sin(this.animTime * 5) * 0.08;
-        ctx.fillStyle =
-          ev.state === 'LOCKED_VISIBLE'
-            ? 'rgba(255, 82, 82, 0.22)'
-            : bCol.glow;
-        this.traceBranchShape(ctx, node.branch, (radius + 9) * pulse);
-        ctx.fill();
-      }
-
-      // Heavy dark outline under the border, matching the sprites' ink lines
-      ctx.strokeStyle = '#05020f';
-      ctx.lineWidth = 7;
-      this.traceBranchShape(ctx, node.branch, radius);
-      ctx.stroke();
-
-      // Node Body in Branch Shape
-      ctx.fillStyle =
-        ev.state === 'LOCKED_VISIBLE'
-          ? '#120a2a'
-          : ev.level > 0
-          ? bCol.bg
-          : '#1d1240';
-      this.traceBranchShape(ctx, node.branch, radius);
-      ctx.fill();
-
-      // Node Border
-      if (ev.state === 'MAXED') {
-        ctx.strokeStyle = '#ffd54f';
-        ctx.lineWidth = 3.5;
-      } else if (ev.state === 'LOCKED_VISIBLE') {
-        ctx.strokeStyle = node.minPlanet > save.highestUnlockedPlanet ? '#00e5ff' : '#ff5252';
-        ctx.lineWidth = 2.5;
-        ctx.setLineDash([5, 3]);
-      } else if (ev.level > 0) {
-        ctx.strokeStyle = bCol.main;
-        ctx.lineWidth = 3;
-      } else if (ev.canAfford) {
-        ctx.strokeStyle = '#39ff88';
-        ctx.lineWidth = 3;
-      } else {
-        ctx.strokeStyle = '#7d6bc4';
-        ctx.lineWidth = 2.5;
-      }
-
-      // Neon tube: the border glows in its own colour
-      ctx.shadowColor = ctx.strokeStyle as string;
-      ctx.shadowBlur = 10;
-      this.traceBranchShape(ctx, node.branch, radius);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.setLineDash([]);
-
-      // Selection Ring
-      if (isSelected) {
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        this.traceBranchShape(ctx, node.branch, radius + 5);
-        ctx.stroke();
-      }
-
-      // Purchase burst: two expanding rings for 0.6s
-      const boughtAt = this.celebrations.get(node.id);
-      if (boughtAt !== undefined) {
-        const t = (this.animTime - boughtAt) / 0.6;
-        if (t >= 1) {
-          this.celebrations.delete(node.id);
-        } else {
-          for (const lag of [0, 0.25]) {
-            const k = Math.max(0, t - lag);
-            ctx.globalAlpha = Math.max(0, 1 - k) * 0.9;
-            ctx.strokeStyle = bCol.main;
-            ctx.lineWidth = 3;
-            this.traceBranchShape(ctx, node.branch, radius + 6 + k * 34);
-            ctx.stroke();
-          }
-          ctx.globalAlpha = 1;
-        }
-      }
-
-      // Colorblind mode: state glyph in a badge at the top-right corner
-      if (save.settings.colorblindMode && node.id !== 'starter_pod') {
-        drawStateGlyph(ctx, radius * 0.78, -radius * 0.78, ev.state, ev.level > 0, ev.canAfford);
-      }
-
-      // Draw Icon inside node
-      const iconCanvas = this.atlas.skillIcons.get(node.icon);
-      if (iconCanvas) {
-        ctx.globalAlpha = ev.state === 'LOCKED_VISIBLE' ? 0.45 : 1.0;
-        ctx.drawImage(iconCanvas, -14, -16, 28, 28);
-        ctx.globalAlpha = 1.0;
-      }
-
-      // Lock Badge or Level Pill at bottom of node
-      ctx.font = '700 11px "Rajdhani", system-ui, sans-serif';
-      ctx.textAlign = 'center';
-
-      if (ev.state === 'LOCKED_VISIBLE') {
-        const isPlanetLock = node.minPlanet > save.highestUnlockedPlanet;
-        const badgeText = isPlanetLock ? `PLANET ${node.minPlanet} LOCK` : 'REQ LOCKED';
-        ctx.fillStyle = isPlanetLock ? '#1f4f7a' : '#7a1f17';
-        ctx.fillRect(-38, radius - 10, 76, 16);
-        ctx.strokeStyle = '#05020f';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(-38, radius - 10, 76, 16);
-        ctx.fillStyle = isPlanetLock ? '#cfe6ff' : '#ffd2c9';
-        ctx.fillText(badgeText, 0, radius + 1);
-      } else {
-        const pillText =
-          node.id === 'starter_pod'
-            ? 'ACTIVE'
-            : ev.state === 'MAXED'
-            ? 'MAX'
-            : `${ev.level}/${ev.maxLevel}`;
-        // LCD level plate
-        ctx.fillStyle = '#05020f';
-        ctx.fillRect(-23, radius - 10, 46, 16);
-        ctx.strokeStyle = '#05020f';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(-23, radius - 10, 46, 16);
-        ctx.fillStyle = ev.state === 'MAXED' || node.id === 'starter_pod' ? '#ffd23f' : '#39ff88';
-        ctx.fillText(pillText, 0, radius + 1);
-      }
-
-      // Node Title & Cost below node
-      // Labels get a dark keyline so they read on the blueprint
-      ctx.font = '700 13px "Rajdhani", system-ui, sans-serif';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'rgba(7, 2, 26, 0.95)';
-      ctx.lineWidth = 4;
-      ctx.strokeText(node.name.toUpperCase(), 0, radius + 20);
-      ctx.fillStyle = ev.state === 'LOCKED_VISIBLE' ? '#a99cc9' : '#efe6ff';
-      ctx.fillText(node.name.toUpperCase(), 0, radius + 20);
-
-      if (ev.state !== 'MAXED') {
-        ctx.font = '700 13px "Rajdhani", system-ui, sans-serif';
-        const costText = `$${ev.nextCost.toLocaleString()}`;
-        ctx.strokeText(costText, 0, radius + 34);
-        ctx.fillStyle =
-          ev.state === 'LOCKED_VISIBLE'
-            ? '#ff9a8a'
-            : ev.canAfford
-            ? '#9cff7a'
-            : '#ffc24a';
-        ctx.fillText(costText, 0, radius + 34);
-      }
-
-      ctx.restore();
-    }
-
+    ctx.translate(0, -this.scrollY);
+    this.drawGoal(ctx, w, save);
+    for (const b of blocks) this.drawTrackHeader(ctx, b.track, b.x, b.y, colW, b.open);
+    for (const c of this.cards) this.drawCard(ctx, c, evals.get(c.node.id)!, save);
     ctx.restore();
+  }
+
+  /** "Next goal: Reach 120 m · +$150 · opens Drill track" across the top. */
+  private drawGoal(ctx: CanvasRenderingContext2D, w: number, save: SaveState): void {
+    const goal = nextGoal(save.currentPlanetId, save.deepestByPlanet[save.currentPlanetId] ?? 0);
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.08)';
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, PAD, 8, w - PAD * 2, GOAL_H - 8, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 12px "Orbitron", sans-serif';
+    ctx.fillStyle = '#00f0ff';
+    ctx.fillText('NEXT GOAL', PAD + 12, 8 + (GOAL_H - 8) / 2);
+    ctx.font = '700 16px "Rajdhani", system-ui, sans-serif';
+    ctx.fillStyle = '#efe6ff';
+    const labelX = PAD + 104;
+    ctx.fillText(goal.label, labelX, 8 + (GOAL_H - 8) / 2);
+    const lw = ctx.measureText(goal.label).width;
+    ctx.font = '600 14px "Rajdhani", system-ui, sans-serif';
+    ctx.fillStyle = '#ffd23f';
+    fitText(ctx, goal.detail, labelX + lw + 10, 8 + (GOAL_H - 8) / 2, w - PAD - 12 - (labelX + lw + 10));
+  }
+
+  private drawTrackHeader(ctx: CanvasRenderingContext2D, track: UpgradeTrack, x: number, y: number, w: number, open: boolean): void {
+    const col = BRANCH_COLORS[track.branch];
+    ctx.fillStyle = open ? col.bg : 'rgba(18, 10, 42, 0.8)';
+    ctx.strokeStyle = open ? col.main : 'rgba(125, 107, 196, 0.6)';
+    ctx.lineWidth = 2;
+    if (!open) ctx.setLineDash([5, 4]);
+    roundRect(ctx, x, y, w, HEAD_H, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = '800 15px "Orbitron", sans-serif';
+    ctx.fillStyle = open ? col.main : '#a99cc9';
+    ctx.fillText(track.name.toUpperCase(), x + 12, y + 20);
+    ctx.font = '600 13px "Rajdhani", system-ui, sans-serif';
+    ctx.fillStyle = open ? '#cfc4ea' : '#ffc24a';
+    fitText(ctx, open ? track.blurb : `Reach ${track.opensAtDepth} m to open`, x + 12, y + 37, w - 24);
+  }
+
+  private drawCard(ctx: CanvasRenderingContext2D, c: CardRect, ev: NodeEvaluation, save: SaveState): void {
+    const { node, x, y, w, h } = c;
+    const col = BRANCH_COLORS[node.branch];
+    const selected = this.selectedNodeId === node.id;
+    const hovered = this.hoveredNodeId === node.id;
+    const locked = ev.state === 'LOCKED_VISIBLE';
+    const maxed = ev.state === 'MAXED';
+    const buyable = ev.state === 'AVAILABLE' && ev.canAfford;
+
+    // Connector up to the card above
+    ctx.strokeStyle = locked ? 'rgba(125, 107, 196, 0.4)' : col.main;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 22, y - CARD_GAP);
+    ctx.lineTo(x + 22, y);
+    ctx.stroke();
+
+    if (buyable) {
+      const pulse = 0.35 + Math.sin(this.animTime * 4) * 0.15;
+      ctx.shadowColor = '#39ff88';
+      ctx.shadowBlur = 14 * pulse * 2;
+    }
+    ctx.fillStyle = locked ? '#120a2a' : ev.level > 0 ? col.bg : '#1d1240';
+    ctx.strokeStyle = selected ? '#ffffff' : maxed ? '#ffd54f' : buyable ? '#39ff88' : locked ? '#5b4a8f' : hovered ? col.main : '#7d6bc4';
+    ctx.lineWidth = selected ? 2.5 : 1.8;
+    if (locked) ctx.setLineDash([5, 3]);
+    roundRect(ctx, x, y, w, h, 9);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Purchase flash
+    const boughtAt = this.celebrations.get(node.id);
+    if (boughtAt !== undefined) {
+      const t = (this.animTime - boughtAt) / 0.5;
+      if (t >= 1) this.celebrations.delete(node.id);
+      else {
+        ctx.globalAlpha = (1 - t) * 0.5;
+        ctx.fillStyle = col.main;
+        roundRect(ctx, x, y, w, h, 9);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    const icon = this.atlas.skillIcons.get(node.icon);
+    const iconSize = maxed ? 20 : 28;
+    if (icon) {
+      ctx.globalAlpha = locked ? 0.4 : 1;
+      ctx.drawImage(icon, x + 8, y + (maxed ? 7 : 8), iconSize, iconSize);
+      ctx.globalAlpha = 1;
+    }
+
+    const tx = x + 8 + iconSize + 8;
+    const textW = w - (tx - x) - 8;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    if (maxed) {
+      ctx.font = '700 13px "Rajdhani", system-ui, sans-serif';
+      ctx.fillStyle = '#cfc4ea';
+      fitText(ctx, `${node.name} · MAX`, tx, y + 22, textW);
+      return;
+    }
+
+    ctx.font = '700 15px "Rajdhani", system-ui, sans-serif';
+    ctx.fillStyle = locked ? '#a99cc9' : '#efe6ff';
+    fitText(ctx, node.name, tx, y + 19, textW - 34);
+
+    // Level read-out on the right of the name row
+    ctx.textAlign = 'right';
+    ctx.font = '700 12px "Share Tech Mono", monospace';
+    ctx.fillStyle = '#39ff88';
+    ctx.fillText(`${ev.level}/${ev.maxLevel}`, x + w - 8, y + 18);
+
+    ctx.textAlign = 'left';
+    ctx.font = '600 12.5px "Rajdhani", system-ui, sans-serif';
+    ctx.fillStyle = '#a99cc9';
+    fitText(ctx, locked ? ev.lockReasons[0] ?? '' : node.perLevel, tx, y + 36, textW);
+
+    // Price, coloured by whether it is affordable now
+    ctx.font = '700 14px "Rajdhani", system-ui, sans-serif';
+    ctx.fillStyle = locked ? '#ff9a8a' : ev.canAfford ? '#9cff7a' : '#ffc24a';
+    ctx.fillText(`$${ev.nextCost.toLocaleString()}`, tx, y + 54);
+
+    if (save.settings.colorblindMode) drawStateGlyph(ctx, x + w - 14, y + h - 14, ev.state, ev.level > 0, ev.canAfford);
   }
 }
 
-/** Shape-only state marker so node state never depends on color: check = owned, plus = buyable, padlock = locked. */
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/** Draws text, trimming it with an ellipsis to fit maxW. */
+function fitText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number): void {
+  if (maxW <= 0) return;
+  let t = text;
+  if (ctx.measureText(t).width > maxW) {
+    while (t.length > 1 && ctx.measureText(`${t}…`).width > maxW) t = t.slice(0, -1);
+    t = `${t}…`;
+  }
+  ctx.fillText(t, x, y);
+}
+
+/** Shape-only state marker so card state never depends on color: check = owned, plus = buyable, padlock = locked. */
 function drawStateGlyph(
   ctx: CanvasRenderingContext2D,
   x: number,

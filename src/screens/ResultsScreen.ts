@@ -1,6 +1,7 @@
 import { PLANETS, PlanetConfig } from '../config/planets';
 import { GameContext } from '../core/GameContext';
 import { DivePayout } from '../game/DivePayout';
+import { milestoneUnlocks, nextGoal } from '../config/milestones';
 import { $ } from '../ui/dom';
 import { isFirstUpgradePending } from '../ui/Progression';
 import { cheapestAvailableCost } from './hangar/upgradeHints';
@@ -28,6 +29,8 @@ export class ResultsScreen {
       outcomeTitle.dataset.outcome = 'safe';
     }
 
+    this.renderMilestoneBanner(payout, planet);
+
     $('results-depth-line').textContent =
       `Max Depth Reached: ${payout.maxDepth}m / ${planet.maxDepth}m (Best: ${save.deepestByPlanet[planet.id]}m)`;
 
@@ -36,7 +39,7 @@ export class ResultsScreen {
     if (reason === 'core_shattered') {
       $('results-core-title').textContent = `${planet.coreName.toUpperCase()} CRACKED OPEN!`;
       $('results-core-sub').textContent = payout.unlockedNextPlanet
-        ? `+$${payout.coreBonus.toLocaleString()} Core Bounty! Planet ${planet.id + 1} (${PLANETS[planet.id].name}) is now unlocked in Planet Map & Deep Grid!`
+        ? `+$${payout.coreBonus.toLocaleString()} Core Bounty! Planet ${planet.id + 1} (${PLANETS[planet.id].name}) is now unlocked, with new upgrades!`
         : `+$${payout.coreBonus.toLocaleString()} Core Bounty awarded!`;
     }
 
@@ -48,6 +51,30 @@ export class ResultsScreen {
     $('results-mult-note').textContent = mult > 1.001 ? `Ore value ×${mult.toFixed(2)} from upgrades` : '';
     this.countUpTotal(payout.totalEarned);
     this.renderUpgradeButton();
+  }
+
+  /** Milestone banner under the outcome title: what was reached, what it opened, and the next goal. */
+  private renderMilestoneBanner(payout: DivePayout, planet: PlanetConfig): void {
+    let banner = document.getElementById('results-milestone');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'results-milestone';
+      banner.className = 'results-milestone';
+      $('results-outcome-title').insertAdjacentElement('afterend', banner);
+    }
+    const reached = payout.milestones.at(-1);
+    const goal = nextGoal(planet.id, this.game.save.deepestByPlanet[planet.id] ?? 0);
+    if (reached) {
+      const opened = payout.milestones.flatMap((m) => milestoneUnlocks(m));
+      banner.innerHTML =
+        `<div class="results-milestone-title">Milestone reached: ${reached.depth} m</div>` +
+        (opened.length > 0 ? `<div class="results-milestone-sub">Opened ${opened.join(', ')}</div>` : '') +
+        `<div class="results-milestone-next">Next goal: ${goal.label}</div>`;
+      banner.dataset.kind = 'reached';
+    } else {
+      banner.innerHTML = `<div class="results-milestone-next">Next goal: ${goal.label} <span>${goal.detail}</span></div>`;
+      banner.dataset.kind = 'next';
+    }
   }
 
   private countToken = 0;
@@ -95,7 +122,7 @@ export class ResultsScreen {
     } else if (payout.isNewBestDepth && payout.reason !== 'core_shattered') {
       stamp = `<span class="stamp-badge cyan">NEW BEST DEPTH</span>`;
     } else if (payout.contractCompleted) {
-      stamp = `<span class="stamp-badge green">CONTRACT MET</span>`;
+      stamp = `<span class="stamp-badge green">ORDER DONE: ${payout.contractReward ?? ''}</span>`;
     }
     $('results-stamps').innerHTML = stamp;
   }
