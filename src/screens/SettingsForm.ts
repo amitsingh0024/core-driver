@@ -61,7 +61,7 @@ export class SettingsForm {
         <div class="setting-row">
           <div class="setting-label-group">
             <span class="setting-title">Colorblind-Friendly Node Shapes</span>
-            <span class="setting-sub">State glyphs on Deep Grid nodes (owned, buyable, locked)</span>
+            <span class="setting-sub">State glyphs on upgrade cards (owned, buyable, locked)</span>
           </div>
           ${toggle('colorblindMode')}
         </div>

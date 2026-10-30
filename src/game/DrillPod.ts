@@ -459,7 +459,17 @@ export class DrillPod {
         );
         sound.playOrePickup(oreCfg.tier, isDouble || this.comboCount > 1);
       } else {
-        particles.addFloatingText(bx, by - 6, 'CARGO FULL!', '#ff5252', 0.95);
+        // Full hold: a richer ore pushes out the cheapest one, so going deeper still pays
+        const cheapest = this.cheapestHeldOre();
+        if (cheapest && ORES[cheapest].value < oreCfg.value) {
+          this.cargoManifest[cheapest]--;
+          if (this.cargoManifest[cheapest] <= 0) delete this.cargoManifest[cheapest];
+          this.cargoManifest[oreCfg.id] = (this.cargoManifest[oreCfg.id] ?? 0) + 1;
+          particles.addFloatingText(bx, by - 6, `SWAP +${oreCfg.name}`, oreCfg.highlightColor, 1.0, `dumped ${ORES[cheapest].name}`);
+          sound.playOrePickup(oreCfg.tier, false);
+        } else {
+          particles.addFloatingText(bx, by - 6, 'CARGO FULL!', '#ff5252', 0.95);
+        }
       }
     }
 
@@ -467,5 +477,13 @@ export class DrillPod {
     b.oreId = null;
     b.armored = false;
     b.hp = 0;
+  }
+
+  private cheapestHeldOre(): string | null {
+    let best: string | null = null;
+    for (const [oreId, count] of Object.entries(this.cargoManifest)) {
+      if (count > 0 && (!best || ORES[oreId].value < ORES[best].value)) best = oreId;
+    }
+    return best;
   }
 }

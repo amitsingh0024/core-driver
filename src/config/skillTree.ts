@@ -46,575 +46,547 @@ export interface SkillNodeConfig {
   name: string;
   branch: SkillBranch;
   icon: SkillIconType;
-  gx: number; // grid X coordinate on the tree canvas
-  gy: number; // grid Y coordinate on the tree canvas
+  /** 1 = first card in its track on that planet, 3 = the late card. */
+  tier: number;
   maxLevel: number;
   baseCost: number;
   costScale: number;
-  minPlanet: number; // 1, 2, or 3 (Stage Lock!)
-  // Node is revealed on the map as soon as ANY node in revealFrom has level >= 1
-  revealFrom: string[];
-  // Lock Condition 1: Single specific skill level requirement
-  requiresSkill?: { nodeId: string; minLevel: number };
-  // Lock Condition 2: Must own ALL listed nodes (level >= 1) before buying (e.g. "Buy these 3 nodes first")
-  requiresNodesAll?: string[];
-  // Lock Condition 3: Must own at least N nodes from a group
-  requiresNodesCount?: { nodeIds: string[]; count: number; label: string };
+  minPlanet: number; // planet that must be unlocked (1, 2 or 3)
+  /** Best depth needed on minPlanet before the card can be bought. */
+  unlockDepth: number;
   description: string;
+  /** One-line summary of a single level, shown on the card ("+12 fuel"). */
+  perLevel: string;
   effectsPerLevel: SkillEffects;
 }
 
+/** The four upgrade tracks. Each opens once the player first reaches its depth on Terra-Vein. */
+export interface UpgradeTrack {
+  branch: SkillBranch;
+  name: string;
+  opensAtDepth: number;
+  blurb: string;
+}
+
+export const UPGRADE_TRACKS: UpgradeTrack[] = [
+  { branch: 'fuel', name: 'Fuel', opensAtDepth: 0, blurb: 'How long a dive lasts' },
+  { branch: 'cargo', name: 'Cargo', opensAtDepth: 50, blurb: 'How much ore you bring back' },
+  { branch: 'drill', name: 'Drill', opensAtDepth: 120, blurb: 'How fast you cut hard rock' },
+  { branch: 'utility', name: 'Systems', opensAtDepth: 200, blurb: 'Steering, winch, scanner, drones' },
+];
+
+export const PLANET_NAMES: Record<number, string> = { 1: 'Terra-Vein', 2: 'Cryo-Vex', 3: 'Pyra-Void' };
+
 export const SKILL_NODES: SkillNodeConfig[] = [
   // ==========================================
-  // CENTER ROOT NODE
+  // PLANET 1: TERRA-VEIN
   // ==========================================
   {
-    id: 'starter_pod',
-    name: 'MK-I Pioneer Drill Rig',
-    branch: 'core',
-    icon: 'pod',
-    gx: 0,
-    gy: 0,
+    id: 'fuel_tank',
+    name: 'Fuel Tank',
+    branch: 'fuel',
+    icon: 'fuel_cap',
+    tier: 1,
+    maxLevel: 8,
+    baseCost: 90,
+    costScale: 1.45,
+    minPlanet: 1,
+    unlockDepth: 0,
+    description: 'Bolts reserve fuel canisters onto the hull. Every level makes the next dive a little longer.',
+    perLevel: '+20 max fuel',
+    effectsPerLevel: { maxFuelFlat: 20 },
+  },
+  {
+    id: 'fuel_injector',
+    name: 'Fuel Injector',
+    branch: 'fuel',
+    icon: 'fuel_eff',
+    tier: 2,
+    maxLevel: 5,
+    baseCost: 900,
+    costScale: 1.45,
+    minPlanet: 1,
+    unlockDepth: 280,
+    description: 'Meters fuel into the thrusters so less is wasted while moving and drilling.',
+    perLevel: '-7% fuel burn',
+    effectsPerLevel: { fuelBurnReduction: 0.07 },
+  },
+  {
+    id: 'cell_siphon',
+    name: 'Cell Siphon',
+    branch: 'fuel',
+    icon: 'fuel_cell',
+    tier: 3,
+    maxLevel: 4,
+    baseCost: 3200,
+    costScale: 1.5,
+    minPlanet: 1,
+    unlockDepth: 380,
+    description: 'Draws more out of every fuel cell you drill and adds a small reserve tank.',
+    perLevel: '+20% fuel from cells, +15 max fuel',
+    effectsPerLevel: { fuelCellBonusPct: 20, maxFuelFlat: 15 },
+  },
+  {
+    id: 'cargo_bay',
+    name: 'Cargo Bay',
+    branch: 'cargo',
+    icon: 'cargo_cap',
+    tier: 1,
+    maxLevel: 6,
+    baseCost: 110,
+    costScale: 1.45,
+    minPlanet: 1,
+    unlockDepth: 0,
+    description: 'Expands the ore hopper so a dive can bring more back.',
+    perLevel: '+4 cargo',
+    effectsPerLevel: { cargoCapFlat: 4 },
+  },
+  {
+    id: 'refinery',
+    name: 'Refinery',
+    branch: 'cargo',
+    icon: 'ore_value',
+    tier: 2,
+    maxLevel: 4,
+    baseCost: 1100,
+    costScale: 1.5,
+    minPlanet: 1,
+    unlockDepth: 280,
+    description: 'Cleans ore on board so the outpost pays more for it.',
+    perLevel: '+10% ore value',
+    effectsPerLevel: { oreValuePct: 10 },
+  },
+  {
+    id: 'vein_splitter',
+    name: 'Vein Splitter',
+    branch: 'cargo',
+    icon: 'double_ore',
+    tier: 3,
+    maxLevel: 4,
+    baseCost: 3800,
+    costScale: 1.55,
+    minPlanet: 1,
+    unlockDepth: 480,
+    description: 'Splits rich ore blocks along their grain, sometimes giving two ores for one.',
+    perLevel: '+6% double ore chance',
+    effectsPerLevel: { doubleOreChance: 0.06 },
+  },
+  {
+    id: 'drill_power',
+    name: 'Drill Power',
+    branch: 'drill',
+    icon: 'drill_dps',
+    tier: 1,
+    maxLevel: 8,
+    baseCost: 200,
+    costScale: 1.42,
+    minPlanet: 1,
+    unlockDepth: 0,
+    description: 'More torque on the bit. Hard rock gives way faster and costs less fuel to cut.',
+    perLevel: '+50% drill power',
+    effectsPerLevel: { drillPowerPct: 50 },
+  },
+  {
+    id: 'drill_width',
+    name: 'Drill Width',
+    branch: 'drill',
+    icon: 'drill_width',
+    tier: 2,
+    maxLevel: 4,
+    baseCost: 1400,
+    costScale: 1.6,
+    minPlanet: 1,
+    unlockDepth: 280,
+    description: 'A wider cutting head clears more rock per pass and catches more ore.',
+    perLevel: 'Wider bore, +20% drill power',
+    effectsPerLevel: { drillWidthPx: 4, drillPowerPct: 20 },
+  },
+  {
+    id: 'rock_penetrator',
+    name: 'Rock Penetrator',
+    branch: 'drill',
+    icon: 'hardness_pen',
+    tier: 2,
+    maxLevel: 4,
+    baseCost: 1000,
+    costScale: 1.55,
+    minPlanet: 1,
+    unlockDepth: 280,
+    description: 'Hardened teeth stop the pod bogging down in dense rock.',
+    perLevel: '-12% hard rock slowdown',
+    effectsPerLevel: { hardnessPenetration: 0.12, drillPowerPct: 10 },
+  },
+  {
+    id: 'core_breaker',
+    name: 'Core-Breaker',
+    branch: 'drill',
+    icon: 'core_damage',
+    tier: 3,
+    maxLevel: 3,
+    baseCost: 4500,
+    costScale: 1.6,
+    minPlanet: 1,
+    unlockDepth: 480,
+    description: 'A resonance charge tuned to planet cores. Needed to crack the Terra-Vein core in good time.',
+    perLevel: '+80% core damage, +40% drill power',
+    effectsPerLevel: { coreDamagePct: 80, drillPowerPct: 40 },
+  },
+  {
+    id: 'thrusters',
+    name: 'Thrusters',
+    branch: 'utility',
+    icon: 'thruster',
+    tier: 1,
+    maxLevel: 4,
+    baseCost: 500,
+    costScale: 1.45,
+    minPlanet: 1,
+    unlockDepth: 0,
+    description: 'Vectoring jets for faster dives and tighter steering into veins.',
+    perLevel: '+10% speed and steering',
+    effectsPerLevel: { moveSpeedPct: 10 },
+  },
+  {
+    id: 'winch',
+    name: 'Winch & Blackbox',
+    branch: 'utility',
+    icon: 'winch',
+    tier: 2,
+    maxLevel: 3,
+    baseCost: 850,
+    costScale: 1.5,
+    minPlanet: 1,
+    unlockDepth: 280,
+    description: 'A faster extract winch, and a blackbox that saves more cargo when you run dry.',
+    perLevel: '+25% winch speed, +8% cargo kept on tow',
+    effectsPerLevel: { winchSpeedPct: 25, crashSavePct: 8 },
+  },
+  {
+    id: 'scanner',
+    name: 'Scanner',
+    branch: 'utility',
+    icon: 'scanner',
+    tier: 2,
+    maxLevel: 3,
+    baseCost: 1200,
+    costScale: 1.5,
+    minPlanet: 1,
+    unlockDepth: 380,
+    description: 'Seismic radar that marks ore veins and fuel cells further away.',
+    perLevel: '+3 tiles radar range',
+    effectsPerLevel: { scannerRangeTiles: 3 },
+  },
+  {
+    id: 'drone_bay',
+    name: 'Mining Drone',
+    branch: 'utility',
+    icon: 'drone',
+    tier: 3,
     maxLevel: 1,
-    baseCost: 0,
+    baseCost: 6000,
     costScale: 1,
     minPlanet: 1,
-    revealFrom: [],
-    description: 'Standard-issue planetary core excavation pod. Upgrade connected nodes to uncover the Deep Grid.',
-    effectsPerLevel: {},
+    unlockDepth: 480,
+    description: 'An orbiting laser drone that mines ore near the pod without using fuel.',
+    perLevel: '+1 drone',
+    effectsPerLevel: { droneCount: 1 },
   },
 
   // ==========================================
-  // PLANET 1: TERRA-VEIN — INNER RING (4 NODES)
+  // PLANET 2: CRYO-VEX
   // ==========================================
   {
-    id: 'drill_torque_1',
-    name: 'Drill Torque I',
-    branch: 'drill',
-    icon: 'drill_dps',
-    gx: 0,
-    gy: -1,
-    maxLevel: 5,
-    baseCost: 18,
-    costScale: 1.65,
-    minPlanet: 1,
-    revealFrom: ['starter_pod'],
-    description: 'Increases rotational drill bit torque. +45% Drill Power per level.',
-    effectsPerLevel: { drillPowerPct: 45 },
+    id: 'cryo_heater',
+    name: 'Thermal Heater',
+    branch: 'fuel',
+    icon: 'hazard_shield',
+    tier: 1,
+    maxLevel: 4,
+    baseCost: 15000,
+    costScale: 1.5,
+    minPlanet: 2,
+    unlockDepth: 0,
+    description: 'Keeps the fuel lines warm. Cancels the Cryo-Vex cold fuel penalty.',
+    perLevel: '-25% cold penalty, +25 max fuel',
+    effectsPerLevel: { cryoShieldPct: 25, maxFuelFlat: 25 },
   },
   {
-    id: 'fuel_tank_1',
-    name: 'Aux Fuel Tank I',
+    id: 'cryo_tank',
+    name: 'Cryo Tank',
     branch: 'fuel',
     icon: 'fuel_cap',
-    gx: 1,
-    gy: 0,
-    maxLevel: 5,
-    baseCost: 18,
-    costScale: 1.6,
-    minPlanet: 1,
-    revealFrom: ['starter_pod'],
-    description: 'Bolts reserve fuel canisters onto the hull. +35 Max Fuel per level.',
-    effectsPerLevel: { maxFuelFlat: 35 },
+    tier: 2,
+    maxLevel: 6,
+    baseCost: 70000,
+    costScale: 1.45,
+    minPlanet: 2,
+    unlockDepth: 180,
+    description: 'Compressed cryo fuel cells. A much larger tank for the deep ice.',
+    perLevel: '+40 max fuel, +5% tank',
+    effectsPerLevel: { maxFuelFlat: 40, maxFuelPct: 5 },
   },
   {
-    id: 'cargo_rack_1',
-    name: 'Cargo Bay I',
+    id: 'friction_shield',
+    name: 'Friction Shield',
+    branch: 'fuel',
+    icon: 'fuel_eff',
+    tier: 3,
+    maxLevel: 4,
+    baseCost: 250000,
+    costScale: 1.55,
+    minPlanet: 2,
+    unlockDepth: 400,
+    description: 'A zero-friction coating that cuts fuel burn and helps through dense ice.',
+    perLevel: '-10% fuel burn, -5% hard rock slowdown',
+    effectsPerLevel: { fuelBurnReduction: 0.1, hardnessPenetration: 0.05 },
+  },
+  {
+    id: 'cargo_matrix',
+    name: 'Cargo Matrix',
     branch: 'cargo',
     icon: 'cargo_cap',
-    gx: 0,
-    gy: 1,
+    tier: 1,
+    maxLevel: 6,
+    baseCost: 18000,
+    costScale: 1.45,
+    minPlanet: 2,
+    unlockDepth: 0,
+    description: 'Sub-zero compression racks for a much bigger hold.',
+    perLevel: '+6 cargo',
+    effectsPerLevel: { cargoCapFlat: 6 },
+  },
+  {
+    id: 'crystal_refinery',
+    name: 'Crystal Refinery',
+    branch: 'cargo',
+    icon: 'ore_value',
+    tier: 2,
     maxLevel: 5,
-    baseCost: 16,
+    baseCost: 90000,
+    costScale: 1.5,
+    minPlanet: 2,
+    unlockDepth: 180,
+    description: 'Grades cryo crystals before sale for a better price.',
+    perLevel: '+15% ore value',
+    effectsPerLevel: { oreValuePct: 15 },
+  },
+  {
+    id: 'cryo_auger',
+    name: 'Cryo Auger',
+    branch: 'drill',
+    icon: 'drill_dps',
+    tier: 1,
+    maxLevel: 5,
+    baseCost: 20000,
+    costScale: 1.5,
+    minPlanet: 2,
+    unlockDepth: 0,
+    description: 'A diamond auger built for ice harder than Terra-Vein bedrock.',
+    perLevel: 'x1.3 drill power',
+    effectsPerLevel: { drillPowerMult: 1.3 },
+  },
+  {
+    id: 'glacier_bore',
+    name: 'Glacier Bore',
+    branch: 'drill',
+    icon: 'drill_width',
+    tier: 2,
+    maxLevel: 3,
+    baseCost: 300000,
     costScale: 1.6,
-    minPlanet: 1,
-    revealFrom: ['starter_pod'],
-    description: 'Expands the internal ore hopper. +8 Cargo Capacity per level.',
+    minPlanet: 2,
+    unlockDepth: 400,
+    description: 'A tri-cone head that cuts a wider shaft through the glacier.',
+    perLevel: 'Wider bore, x1.15 drill power',
+    effectsPerLevel: { drillWidthPx: 4, drillPowerMult: 1.15 },
+  },
+  {
+    id: 'core_shatterer',
+    name: 'Core Shatterer',
+    branch: 'drill',
+    icon: 'core_damage',
+    tier: 3,
+    maxLevel: 3,
+    baseCost: 900000,
+    costScale: 1.6,
+    minPlanet: 2,
+    unlockDepth: 680,
+    description: 'Harmonic charges for the Absolute-Zero core.',
+    perLevel: '+100% core damage, x1.15 drill power',
+    effectsPerLevel: { coreDamagePct: 100, drillPowerMult: 1.15 },
+  },
+  {
+    id: 'deep_sonar',
+    name: 'Deep Sonar',
+    branch: 'utility',
+    icon: 'scanner',
+    tier: 1,
+    maxLevel: 3,
+    baseCost: 60000,
+    costScale: 1.5,
+    minPlanet: 2,
+    unlockDepth: 180,
+    description: 'Sub-glacial sonar with longer range, plus faster thrusters.',
+    perLevel: '+3 tiles radar range, +8% speed',
+    effectsPerLevel: { scannerRangeTiles: 3, moveSpeedPct: 8 },
+  },
+  {
+    id: 'twin_drones',
+    name: 'Twin Drones',
+    branch: 'utility',
+    icon: 'drone',
+    tier: 3,
+    maxLevel: 1,
+    baseCost: 1200000,
+    costScale: 1,
+    minPlanet: 2,
+    unlockDepth: 680,
+    description: 'A second mining drone, and stronger lasers for both.',
+    perLevel: '+1 drone, +100% drone power',
+    effectsPerLevel: { droneCount: 1, dronePowerPct: 100 },
+  },
+
+  // ==========================================
+  // PLANET 3: PYRA-VOID
+  // ==========================================
+  {
+    id: 'void_jacket',
+    name: 'Void Cooling Jacket',
+    branch: 'fuel',
+    icon: 'hazard_shield',
+    tier: 1,
+    maxLevel: 4,
+    baseCost: 5_000_000,
+    costScale: 1.5,
+    minPlanet: 3,
+    unlockDepth: 0,
+    description: 'Plasma cooling that cancels the Pyra-Void heat penalty.',
+    perLevel: '-25% heat penalty, +60 max fuel',
+    effectsPerLevel: { voidShieldPct: 25, maxFuelFlat: 60 },
+  },
+  {
+    id: 'fusion_tank',
+    name: 'Fusion Tank',
+    branch: 'fuel',
+    icon: 'fuel_cap',
+    tier: 2,
+    maxLevel: 6,
+    baseCost: 24_000_000,
+    costScale: 1.45,
+    minPlanet: 3,
+    unlockDepth: 250,
+    description: 'A micro-fusion core feeding the thrusters.',
+    perLevel: '+60 max fuel, +5% tank',
+    effectsPerLevel: { maxFuelFlat: 60, maxFuelPct: 5 },
+  },
+  {
+    id: 'void_hold',
+    name: 'Void Hold',
+    branch: 'cargo',
+    icon: 'cargo_cap',
+    tier: 1,
+    maxLevel: 6,
+    baseCost: 6_000_000,
+    costScale: 1.45,
+    minPlanet: 3,
+    unlockDepth: 0,
+    description: 'Folded-space cargo racks.',
+    perLevel: '+8 cargo',
     effectsPerLevel: { cargoCapFlat: 8 },
   },
   {
-    id: 'thruster_1',
-    name: 'Vector Thrusters I',
-    branch: 'utility',
-    icon: 'thruster',
-    gx: -1,
-    gy: 0,
-    maxLevel: 4,
-    baseCost: 20,
-    costScale: 1.65,
-    minPlanet: 1,
-    revealFrom: ['starter_pod'],
-    description: 'Sharpens continuous steering angle response and downward thrust. +15% Speed & Agility per level.',
-    effectsPerLevel: { moveSpeedPct: 15 },
-  },
-
-  // ==========================================
-  // PLANET 1: MID-RING & MULTI-NODE GATES
-  // ==========================================
-  {
-    id: 'twin_bore_1',
-    name: 'Twin-Bore Excavator',
-    branch: 'drill',
-    icon: 'drill_width',
-    gx: 1,
-    gy: -1,
-    maxLevel: 3,
-    baseCost: 95,
-    costScale: 2.1,
-    minPlanet: 1,
-    revealFrom: ['drill_torque_1', 'fuel_tank_1'],
-    requiresNodesAll: ['drill_torque_1', 'fuel_tank_1', 'thruster_1'],
-    description: 'Widens the physical drill head to chew through multiple rock columns at once! +4px Drill Radius & +30% Drill Power per level.',
-    effectsPerLevel: { drillWidthPx: 4, drillPowerPct: 30 },
-  },
-  {
-    id: 'carbide_teeth',
-    name: 'Carbide Drill Teeth',
-    branch: 'drill',
-    icon: 'drill_dps',
-    gx: 0,
-    gy: -2,
-    maxLevel: 5,
-    baseCost: 75,
-    costScale: 1.75,
-    minPlanet: 1,
-    revealFrom: ['drill_torque_1'],
-    requiresSkill: { nodeId: 'drill_torque_1', minLevel: 2 },
-    description: 'Tungsten-carbide serrated cones shred sandstone and granite. +75% Drill Power per level.',
-    effectsPerLevel: { drillPowerPct: 75 },
-  },
-  {
-    id: 'rock_crusher_1',
-    name: 'Hardness Penetrator I',
-    branch: 'drill',
-    icon: 'hardness_pen',
-    gx: -1,
-    gy: -2,
-    maxLevel: 3,
-    baseCost: 130,
-    costScale: 1.9,
-    minPlanet: 1,
-    revealFrom: ['carbide_teeth', 'thruster_1'],
-    requiresSkill: { nodeId: 'carbide_teeth', minLevel: 2 },
-    description: 'Ultrasonic micro-vibrations prevent hard rock from slowing down your drill pod. +18% Hardness Penetration per level.',
-    effectsPerLevel: { hardnessPenetration: 0.18, drillPowerPct: 25 },
-  },
-  {
-    id: 'fuel_injector_1',
-    name: 'Fuel Injector I',
-    branch: 'fuel',
-    icon: 'fuel_eff',
-    gx: 2,
-    gy: 0,
-    maxLevel: 4,
-    baseCost: 70,
-    costScale: 1.75,
-    minPlanet: 1,
-    revealFrom: ['fuel_tank_1'],
-    requiresSkill: { nodeId: 'fuel_tank_1', minLevel: 2 },
-    description: 'Optimizes fuel-air mixture under pressure. Reduces all fuel consumption by 9% per level.',
-    effectsPerLevel: { fuelBurnReduction: 0.09 },
-  },
-  {
-    id: 'cell_harvester_1',
-    name: 'Fuel Cell Siphon I',
-    branch: 'fuel',
-    icon: 'fuel_cell',
-    gx: 2,
-    gy: -1,
-    maxLevel: 3,
-    baseCost: 110,
-    costScale: 1.85,
-    minPlanet: 1,
-    revealFrom: ['fuel_injector_1', 'twin_bore_1'],
-    description: 'Extracts every drop from subterranean Fuel Cells. +20% Fuel restored per cell & +20 Max Fuel per level.',
-    effectsPerLevel: { fuelCellBonusPct: 20, maxFuelFlat: 20 },
-  },
-  {
-    id: 'smelter_1',
-    name: 'Onboard Refinery I',
-    branch: 'cargo',
-    icon: 'ore_value',
-    gx: 1,
-    gy: 1,
-    maxLevel: 5,
-    baseCost: 85,
-    costScale: 1.8,
-    minPlanet: 1,
-    revealFrom: ['cargo_rack_1', 'fuel_tank_1'],
-    requiresNodesAll: ['drill_torque_1', 'fuel_tank_1', 'cargo_rack_1'],
-    description: 'Purifies raw ore during extraction. +30% Sell Value for all ores per level.',
-    effectsPerLevel: { oreValuePct: 30 },
-  },
-  {
-    id: 'deep_cargo_1',
-    name: 'Reinforced Hopper II',
-    branch: 'cargo',
-    icon: 'cargo_cap',
-    gx: 0,
-    gy: 2,
-    maxLevel: 4,
-    baseCost: 90,
-    costScale: 1.75,
-    minPlanet: 1,
-    revealFrom: ['cargo_rack_1'],
-    requiresSkill: { nodeId: 'cargo_rack_1', minLevel: 2 },
-    description: 'Hydraulic ore compaction bay. +14 Cargo Capacity per level.',
-    effectsPerLevel: { cargoCapFlat: 14 },
-  },
-  {
-    id: 'vein_splitter_1',
-    name: 'Harmonic Vein Splitter',
+    id: 'ore_transmuter',
+    name: 'Ore Transmuter',
     branch: 'cargo',
     icon: 'double_ore',
-    gx: 1,
-    gy: 2,
-    maxLevel: 3,
-    baseCost: 180,
-    costScale: 2.0,
-    minPlanet: 1,
-    revealFrom: ['smelter_1', 'deep_cargo_1'],
-    requiresSkill: { nodeId: 'smelter_1', minLevel: 2 },
-    description: 'Splits mineral seams cleanly without waste. +14% chance per level for any mined ore block to yield 2× Ore!',
-    effectsPerLevel: { doubleOreChance: 0.14 },
+    tier: 2,
+    maxLevel: 5,
+    baseCost: 30_000_000,
+    costScale: 1.5,
+    minPlanet: 3,
+    unlockDepth: 250,
+    description: 'Transmutes slag into sellable ore and raises its grade.',
+    perLevel: '+20% ore value, +4% double ore',
+    effectsPerLevel: { oreValuePct: 20, doubleOreChance: 0.04 },
   },
   {
-    id: 'winch_spool_1',
-    name: 'Rapid Winch & Blackbox',
-    branch: 'utility',
-    icon: 'winch',
-    gx: -1,
-    gy: 1,
-    maxLevel: 3,
-    baseCost: 65,
-    costScale: 1.75,
-    minPlanet: 1,
-    revealFrom: ['thruster_1', 'cargo_rack_1'],
-    description: 'Speeds up Hold-to-Extract winch by +25% per level and saves +10% more cargo if Fuel hits 0.',
-    effectsPerLevel: { winchSpeedPct: 25, crashSavePct: 10 },
-  },
-  {
-    id: 'deep_radar_1',
-    name: 'Seismic Vein Scanner I',
-    branch: 'utility',
-    icon: 'scanner',
-    gx: -2,
-    gy: 0,
-    maxLevel: 3,
-    baseCost: 80,
-    costScale: 1.8,
-    minPlanet: 1,
-    revealFrom: ['thruster_1'],
-    description: 'Displays HUD directional indicators pointing to nearby Fuel Cells and high-value ore pockets.',
-    effectsPerLevel: { scannerRangeTiles: 5 },
-  },
-  {
-    id: 'drone_bay_1',
-    name: 'Autonomous Laser Drone I',
-    branch: 'drone',
-    icon: 'drone',
-    gx: -1,
-    gy: 2,
-    maxLevel: 1,
-    baseCost: 320,
-    costScale: 1,
-    minPlanet: 1,
-    revealFrom: ['winch_spool_1', 'deep_cargo_1', 'deep_radar_1'],
-    requiresNodesAll: ['winch_spool_1', 'deep_cargo_1', 'deep_radar_1'],
-    description: 'Deploys an autonomous orbiting laser drone that automatically mines adjacent rock and ore tiles alongside your pod!',
-    effectsPerLevel: { droneCount: 1 },
-  },
-  {
-    id: 'core_breaker_1',
-    name: 'Core-Breaker Resonance I',
-    branch: 'drill',
-    icon: 'core_damage',
-    gx: 0,
-    gy: -3,
-    maxLevel: 3,
-    baseCost: 260,
-    costScale: 2.0,
-    minPlanet: 1,
-    revealFrom: ['carbide_teeth', 'twin_bore_1', 'rock_crusher_1'],
-    requiresSkill: { nodeId: 'carbide_teeth', minLevel: 3 },
-    description: 'Tunes drill frequency to shatter dense planetary cores. +85% Core Damage & +50% Drill Power per level.',
-    effectsPerLevel: { coreDamagePct: 85, drillPowerPct: 50 },
-  },
-
-  // ==========================================
-  // PLANET 2: CRYO-VEX — STAGE-LOCKED TIER (minPlanet: 2)
-  // ==========================================
-  {
-    id: 'cryo_heater_1',
-    name: 'Thermal Core Heater',
-    branch: 'fuel',
-    icon: 'hazard_shield',
-    gx: 2,
-    gy: -2,
-    maxLevel: 3,
-    baseCost: 1400,
-    costScale: 1.9,
-    minPlanet: 2,
-    revealFrom: ['cell_harvester_1', 'twin_bore_1', 'core_breaker_1'],
-    description: 'Insulates fuel lines against Cryo-Vex sub-zero temperatures. Neutralizes 35% of Cryo-Chill fuel drain & +110 Max Fuel per level.',
-    effectsPerLevel: { cryoShieldPct: 35, maxFuelFlat: 110 },
-  },
-  {
-    id: 'diamond_auger_1',
-    name: 'Cryo-Diamond Auger',
+    id: 'singularity_lance',
+    name: 'Singularity Lance',
     branch: 'drill',
     icon: 'drill_dps',
-    gx: 0,
-    gy: -4,
+    tier: 1,
     maxLevel: 5,
-    baseCost: 1800,
-    costScale: 1.85,
-    minPlanet: 2,
-    revealFrom: ['core_breaker_1'],
-    description: 'Industrial diamond cutter built for glacial quartzite and cryo-glass. ×1.55 Multiplicative Drill Power per level!',
-    effectsPerLevel: { drillPowerMult: 1.55, drillPowerPct: 120 },
+    baseCost: 7_000_000,
+    costScale: 1.5,
+    minPlanet: 3,
+    unlockDepth: 0,
+    description: 'A lance drill that cuts obsidian and brimstone.',
+    perLevel: 'x1.45 drill power',
+    effectsPerLevel: { drillPowerMult: 1.45 },
   },
   {
-    id: 'glacier_bore_2',
-    name: 'Tri-Cone Glacier Bore',
+    id: 'planet_eater',
+    name: 'Planet-Eater Bore',
     branch: 'drill',
     icon: 'drill_width',
-    gx: 1,
-    gy: -3,
+    tier: 2,
     maxLevel: 3,
-    baseCost: 3600,
-    costScale: 2.1,
-    minPlanet: 2,
-    revealFrom: ['twin_bore_1', 'core_breaker_1', 'diamond_auger_1'],
-    requiresNodesAll: ['twin_bore_1', 'diamond_auger_1', 'cryo_heater_1'],
-    description: 'Massive 3-cone rotary head that carves wide caverns through permafrost. +4px Drill Radius & ×1.35 Drill Power per level.',
-    effectsPerLevel: { drillWidthPx: 4, drillPowerMult: 1.35 },
+    baseCost: 80_000_000,
+    costScale: 1.6,
+    minPlanet: 3,
+    unlockDepth: 580,
+    description: 'The widest cutting head the outpost can build.',
+    perLevel: 'Wider bore, x1.2 drill power',
+    effectsPerLevel: { drillWidthPx: 5, drillPowerMult: 1.2 },
   },
   {
-    id: 'cryo_tank_2',
-    name: 'Cryo-Compressed Fuel Cell',
-    branch: 'fuel',
-    icon: 'fuel_cap',
-    gx: 3,
-    gy: 0,
-    maxLevel: 5,
-    baseCost: 1600,
-    costScale: 1.8,
-    minPlanet: 2,
-    revealFrom: ['fuel_injector_1', 'cell_harvester_1'],
-    description: 'Stores liquid hydrogen at cryogenic density. +140 Max Fuel & +12% Max Fuel Multiplier per level.',
-    effectsPerLevel: { maxFuelFlat: 140, maxFuelPct: 12 },
-  },
-  {
-    id: 'superconductor_lube',
-    name: 'Zero-K Friction Shield',
-    branch: 'fuel',
-    icon: 'fuel_eff',
-    gx: 3,
-    gy: -1,
-    maxLevel: 4,
-    baseCost: 2800,
-    costScale: 1.9,
-    minPlanet: 2,
-    revealFrom: ['cryo_tank_2', 'cell_harvester_1'],
-    requiresSkill: { nodeId: 'cryo_tank_2', minLevel: 2 },
-    description: 'Magnetic bearing suspension cuts rock-drilling fuel burn by 14% per level.',
-    effectsPerLevel: { fuelBurnReduction: 0.14, hardnessPenetration: 0.12 },
-  },
-  {
-    id: 'plasma_refinery_2',
-    name: 'Cryo-Crystal Refinery',
-    branch: 'cargo',
-    icon: 'ore_value',
-    gx: 2,
-    gy: 1,
-    maxLevel: 5,
-    baseCost: 1900,
-    costScale: 1.85,
-    minPlanet: 2,
-    revealFrom: ['smelter_1', 'fuel_injector_1', 'vein_splitter_1'],
-    description: 'Laser-cuts raw gems before surfacing. +65% Ore Sell Value per level.',
-    effectsPerLevel: { oreValuePct: 65 },
-  },
-  {
-    id: 'quantum_cargo_2',
-    name: 'Sub-Zero Cargo Matrix',
-    branch: 'cargo',
-    icon: 'cargo_cap',
-    gx: 0,
-    gy: 3,
-    maxLevel: 5,
-    baseCost: 1700,
-    costScale: 1.8,
-    minPlanet: 2,
-    revealFrom: ['deep_cargo_1', 'vein_splitter_1', 'drone_bay_1'],
-    description: 'High-density magnetic ore stacking bay. +28 Cargo Capacity per level.',
-    effectsPerLevel: { cargoCapFlat: 28 },
-  },
-  {
-    id: 'deep_radar_2',
-    name: 'Sub-Glacial Deep Sonar',
-    branch: 'utility',
-    icon: 'scanner',
-    gx: -3,
-    gy: 0,
-    maxLevel: 3,
-    baseCost: 1650,
-    costScale: 1.85,
-    minPlanet: 2,
-    revealFrom: ['deep_radar_1', 'winch_spool_1'],
-    description: 'Long-range ice-penetrating radar & high-output thrusters. +6 Radar Range & +15% Dive Speed per level.',
-    effectsPerLevel: { scannerRangeTiles: 6, moveSpeedPct: 15 },
-  },
-  {
-    id: 'drone_bay_2',
-    name: 'Twin Cryo-Laser Drones',
-    branch: 'drone',
-    icon: 'drone',
-    gx: -1,
-    gy: 3,
-    maxLevel: 1,
-    baseCost: 6500,
-    costScale: 1,
-    minPlanet: 2,
-    revealFrom: ['drone_bay_1', 'quantum_cargo_2'],
-    requiresNodesAll: ['drone_bay_1', 'quantum_cargo_2', 'deep_radar_2'],
-    description: 'Launches a 2nd autonomous mining drone and increases all drone laser damage by +100%!',
-    effectsPerLevel: { droneCount: 1, dronePowerPct: 100 },
-  },
-  {
-    id: 'core_breaker_2',
-    name: 'Harmonic Core Shatterer',
+    id: 'omega_breaker',
+    name: 'Omega Core Breaker',
     branch: 'drill',
     icon: 'core_damage',
-    gx: -1,
-    gy: -4,
+    tier: 3,
     maxLevel: 3,
-    baseCost: 5200,
-    costScale: 2.0,
-    minPlanet: 2,
-    revealFrom: ['diamond_auger_1', 'rock_crusher_1', 'core_breaker_1'],
-    requiresSkill: { nodeId: 'diamond_auger_1', minLevel: 2 },
-    description: 'Resonates with crystalline cores. +140% Core Damage & ×1.35 Drill Power per level.',
-    effectsPerLevel: { coreDamagePct: 140, drillPowerMult: 1.35 },
-  },
-
-  // ==========================================
-  // PLANET 3: PYRA-VOID — STAGE-LOCKED TIER (minPlanet: 3)
-  // ==========================================
-  {
-    id: 'void_cooling_3',
-    name: 'Void-Plasma Cooling Jacket',
-    branch: 'fuel',
-    icon: 'hazard_shield',
-    gx: 3,
-    gy: -2,
-    maxLevel: 3,
-    baseCost: 48000,
-    costScale: 1.95,
+    baseCost: 240_000_000,
+    costScale: 1.6,
     minPlanet: 3,
-    revealFrom: ['cryo_heater_1', 'superconductor_lube', 'glacier_bore_2'],
-    description: 'Shields the pod against Pyra-Void gravity & plasma vents. Neutralizes 35% of Void-Heat fuel drain & +450 Max Fuel per level.',
-    effectsPerLevel: { voidShieldPct: 35, maxFuelFlat: 450 },
+    unlockDepth: 950,
+    description: 'The charge that cracks the Singularity Core.',
+    perLevel: '+200% core damage, x1.25 drill power',
+    effectsPerLevel: { coreDamagePct: 200, drillPowerMult: 1.25 },
   },
   {
-    id: 'singularity_drill_3',
-    name: 'Singularity Lance Drill',
-    branch: 'drill',
-    icon: 'drill_dps',
-    gx: 0,
-    gy: -5,
-    maxLevel: 5,
-    baseCost: 60000,
-    costScale: 1.9,
-    minPlanet: 3,
-    revealFrom: ['diamond_auger_1', 'core_breaker_2', 'glacier_bore_2'],
-    description: 'Projects a focused micro-singularity beam at the drill tip. ×1.75 Multiplicative Drill Power per level!',
-    effectsPerLevel: { drillPowerMult: 1.75 },
-  },
-  {
-    id: 'titan_excavator_3',
-    name: 'Planet-Eater Wide Bore',
-    branch: 'drill',
-    icon: 'drill_width',
-    gx: 1,
-    gy: -5,
-    maxLevel: 3,
-    baseCost: 140000,
-    costScale: 2.1,
-    minPlanet: 3,
-    revealFrom: ['glacier_bore_2', 'singularity_drill_3'],
-    requiresNodesAll: ['glacier_bore_2', 'singularity_drill_3', 'void_cooling_3'],
-    description: 'Engulfs entire ore veins in a single pass. +5px Drill Radius & ×1.5 Drill Power per level.',
-    effectsPerLevel: { drillWidthPx: 5, drillPowerMult: 1.5 },
-  },
-  {
-    id: 'reactor_tank_3',
-    name: 'Micro-Fusion Fuel Core',
-    branch: 'fuel',
-    icon: 'fuel_cap',
-    gx: 4,
-    gy: 0,
-    maxLevel: 5,
-    baseCost: 55000,
-    costScale: 1.85,
-    minPlanet: 3,
-    revealFrom: ['cryo_tank_2', 'superconductor_lube'],
-    description: 'Tokamak fusion cell providing massive endurance. +500 Max Fuel & +20% Max Fuel Multiplier per level.',
-    effectsPerLevel: { maxFuelFlat: 500, maxFuelPct: 20 },
-  },
-  {
-    id: 'matter_transmuter_3',
-    name: 'Singularity Ore Transmuter',
-    branch: 'cargo',
-    icon: 'ore_value',
-    gx: 3,
-    gy: 1,
-    maxLevel: 5,
-    baseCost: 65000,
-    costScale: 1.9,
-    minPlanet: 3,
-    revealFrom: ['plasma_refinery_2', 'cryo_tank_2'],
-    description: 'Enriches exotic matter at the atomic level. +120% Ore Sell Value & +8% Double-Ore Chance per level.',
-    effectsPerLevel: { oreValuePct: 120, doubleOreChance: 0.08 },
-  },
-  {
-    id: 'drone_swarm_3',
-    name: 'Void Drone Squadron (3×)',
-    branch: 'drone',
+    id: 'void_drones',
+    name: 'Void Drone',
+    branch: 'utility',
     icon: 'drone',
-    gx: -1,
-    gy: 4,
+    tier: 3,
     maxLevel: 1,
-    baseCost: 220000,
+    baseCost: 100_000_000,
     costScale: 1,
     minPlanet: 3,
-    revealFrom: ['drone_bay_2', 'quantum_cargo_2'],
-    requiresNodesAll: ['drone_bay_2', 'matter_transmuter_3'],
-    description: 'Completes the 3-drone orbital mining squadron and triples drone beam output!',
+    unlockDepth: 580,
+    description: 'A third drone with void lasers.',
+    perLevel: '+1 drone, +150% drone power',
     effectsPerLevel: { droneCount: 1, dronePowerPct: 150 },
-  },
-  {
-    id: 'omega_core_breaker',
-    name: 'Omega Core Annihilator',
-    branch: 'drill',
-    icon: 'core_damage',
-    gx: 0,
-    gy: -6,
-    maxLevel: 3,
-    baseCost: 250000,
-    costScale: 2.1,
-    minPlanet: 3,
-    revealFrom: ['singularity_drill_3', 'core_breaker_2', 'titan_excavator_3'],
-    requiresSkill: { nodeId: 'singularity_drill_3', minLevel: 2 },
-    description: 'Ultimate core-cracking resonance. +250% Core Damage & ×1.65 Drill Power per level.',
-    effectsPerLevel: { coreDamagePct: 250, drillPowerMult: 1.65 },
   },
 ];
 
 export const SKILL_NODE_MAP: Record<string, SkillNodeConfig> = Object.fromEntries(
   SKILL_NODES.map((n) => [n.id, n])
 );
+
+export function trackFor(branch: SkillBranch): UpgradeTrack | undefined {
+  return UPGRADE_TRACKS.find((t) => t.branch === branch);
+}
+
+/** A track is open once the player has reached its depth on Terra-Vein (or left Terra-Vein). */
+export function isTrackOpen(
+  track: UpgradeTrack,
+  highestUnlockedPlanet: number,
+  deepestByPlanet: Record<number, number>
+): boolean {
+  return highestUnlockedPlanet > 1 || (deepestByPlanet[1] ?? 0) >= track.opensAtDepth;
+}
 
 export type NodeVisibilityState = 'HIDDEN' | 'LOCKED_VISIBLE' | 'AVAILABLE' | 'MAXED';
 
@@ -632,127 +604,51 @@ export function getNodeNextCost(node: SkillNodeConfig, currentLevel: number): nu
   return Math.round(node.baseCost * Math.pow(node.costScale, currentLevel));
 }
 
+/**
+ * Card state. Cards on a closed track or a locked planet are HIDDEN, cards waiting on a depth
+ * are LOCKED_VISIBLE with a "Reach 280 m" reason.
+ */
 export function evaluateSkillNode(
   node: SkillNodeConfig,
   ownedLevels: Record<string, number>,
   highestUnlockedPlanet: number,
-  currentCash: number
+  currentCash: number,
+  deepestByPlanet: Record<number, number>
 ): NodeEvaluation {
   const level = ownedLevels[node.id] ?? 0;
   const nextCost = getNodeNextCost(node, level);
+  const base = { level, maxLevel: node.maxLevel, nextCost };
 
-  // Root node is always owned
-  if (node.id === 'starter_pod') {
-    return {
-      state: 'MAXED',
-      level: 1,
-      maxLevel: 1,
-      nextCost: 0,
-      canAfford: true,
-      lockReasons: [],
-    };
+  const track = trackFor(node.branch);
+  if (track && !isTrackOpen(track, highestUnlockedPlanet, deepestByPlanet) && level === 0) {
+    return { ...base, state: 'HIDDEN', canAfford: false, lockReasons: [`Reach ${track.opensAtDepth} m to open ${track.name}`] };
   }
-
-  // Check if revealed: must own at least one node in revealFrom (or already have level > 0)
-  const isRevealed =
-    level > 0 ||
-    node.revealFrom.some((parentId) => (ownedLevels[parentId] ?? 0) >= 1);
-
-  if (!isRevealed) {
-    return {
-      state: 'HIDDEN',
-      level,
-      maxLevel: node.maxLevel,
-      nextCost,
-      canAfford: false,
-      lockReasons: ['Buy a connected node first to reveal'],
-    };
-  }
-
-  if (level >= node.maxLevel) {
-    return {
-      state: 'MAXED',
-      level,
-      maxLevel: node.maxLevel,
-      nextCost: 0,
-      canAfford: false,
-      lockReasons: [],
-    };
-  }
-
-  const lockReasons: string[] = [];
-
-  // 1. Stage / Planet lock
   if (highestUnlockedPlanet < node.minPlanet) {
-    const planetNames: Record<number, string> = {
-      1: 'Planet 1 (Terra-Vein)',
-      2: 'Planet 2 (Cryo-Vex)',
-      3: 'Planet 3 (Pyra-Void)',
-    };
-    lockReasons.push(`Stage Locked: Unlock ${planetNames[node.minPlanet]} first`);
+    return { ...base, state: 'HIDDEN', canAfford: false, lockReasons: [`Unlock ${PLANET_NAMES[node.minPlanet]} first`] };
   }
-
-  // 2. Single Skill Level Prerequisite
-  if (node.requiresSkill) {
-    const reqNode = SKILL_NODE_MAP[node.requiresSkill.nodeId];
-    const haveLv = ownedLevels[node.requiresSkill.nodeId] ?? 0;
-    if (haveLv < node.requiresSkill.minLevel) {
-      lockReasons.push(
-        `Requires ${reqNode?.name ?? node.requiresSkill.nodeId} Lv ${node.requiresSkill.minLevel} (${haveLv}/${node.requiresSkill.minLevel})`
-      );
-    }
+  if (level >= node.maxLevel) {
+    return { ...base, nextCost: 0, state: 'MAXED', canAfford: false, lockReasons: [] };
   }
-
-  // 3. Multi-Node Prerequisite ("Buy these 3 nodes first")
-  if (node.requiresNodesAll && node.requiresNodesAll.length > 0) {
-    const missingNames: string[] = [];
-    let ownedCount = 0;
-    for (const reqId of node.requiresNodesAll) {
-      if ((ownedLevels[reqId] ?? 0) >= 1) {
-        ownedCount++;
-      } else {
-        missingNames.push(SKILL_NODE_MAP[reqId]?.name ?? reqId);
-      }
-    }
-    if (missingNames.length > 0) {
-      lockReasons.push(
-        `Buy all ${node.requiresNodesAll.length} prerequisite nodes first (${ownedCount}/${node.requiresNodesAll.length}): ${missingNames.join(', ')}`
-      );
-    }
+  const canAfford = currentCash >= nextCost;
+  if ((deepestByPlanet[node.minPlanet] ?? 0) < node.unlockDepth) {
+    const where = node.minPlanet > 1 ? ` on ${PLANET_NAMES[node.minPlanet]}` : '';
+    return { ...base, state: 'LOCKED_VISIBLE', canAfford, lockReasons: [`Reach ${node.unlockDepth} m${where}`] };
   }
+  return { ...base, state: 'AVAILABLE', canAfford, lockReasons: [] };
+}
 
-  // 4. Count of group Prerequisite
-  if (node.requiresNodesCount) {
-    let count = 0;
-    for (const id of node.requiresNodesCount.nodeIds) {
-      if ((ownedLevels[id] ?? 0) >= 1) count++;
-    }
-    if (count < node.requiresNodesCount.count) {
-      lockReasons.push(
-        `${node.requiresNodesCount.label} (${count}/${node.requiresNodesCount.count})`
-      );
-    }
+/** Every upgrade the player could buy right now (ignoring cash), with its next-level price. */
+export function buyableUpgrades(save: {
+  ownedSkills: Record<string, number>;
+  highestUnlockedPlanet: number;
+  deepestByPlanet: Record<number, number>;
+}): { id: string; cost: number }[] {
+  const out: { id: string; cost: number }[] = [];
+  for (const node of SKILL_NODES) {
+    const ev = evaluateSkillNode(node, save.ownedSkills, save.highestUnlockedPlanet, Infinity, save.deepestByPlanet);
+    if (ev.state === 'AVAILABLE') out.push({ id: node.id, cost: ev.nextCost });
   }
-
-  if (lockReasons.length > 0) {
-    return {
-      state: 'LOCKED_VISIBLE',
-      level,
-      maxLevel: node.maxLevel,
-      nextCost,
-      canAfford: currentCash >= nextCost,
-      lockReasons,
-    };
-  }
-
-  return {
-    state: 'AVAILABLE',
-    level,
-    maxLevel: node.maxLevel,
-    nextCost,
-    canAfford: currentCash >= nextCost,
-    lockReasons: [],
-  };
+  return out;
 }
 
 export interface ComputedPlayerStats {
@@ -834,43 +730,43 @@ export function computePlayerStats(ownedLevels: Record<string, number>): Compute
   const drillPower = baseDrillPower * (1 + drillPowerPct / 100) * drillPowerMult;
   const drillRadiusPx = 21 + drillWidthPx * 1.45; // starts at 21px (~1 tile wide), grows up to 78px!
 
-  const baseFuel = 100;
+  const baseFuel = 35;
   const maxFuel = Math.round((baseFuel + maxFuelFlat) * (1 + maxFuelPct / 100));
   const fuelBurnMultiplier = Math.max(0.22, Math.pow(0.88, fuelBurnReduction / 0.12));
 
   let podTier = 1;
-  if ((ownedLevels['singularity_drill_3'] ?? 0) > 0 || (ownedLevels['void_cooling_3'] ?? 0) > 0) {
+  if ((ownedLevels['singularity_lance'] ?? 0) > 0 || (ownedLevels['void_jacket'] ?? 0) > 0) {
     podTier = 3;
-  } else if ((ownedLevels['diamond_auger_1'] ?? 0) > 0 || (ownedLevels['cryo_heater_1'] ?? 0) > 0) {
+  } else if ((ownedLevels['cryo_auger'] ?? 0) > 0 || (ownedLevels['cryo_heater'] ?? 0) > 0) {
     podTier = 2;
   }
 
   let drillVisualTier = 0;
-  if ((ownedLevels['titan_excavator_3'] ?? 0) > 0 || (ownedLevels['singularity_drill_3'] ?? 0) > 0) {
+  if ((ownedLevels['planet_eater'] ?? 0) > 0 || (ownedLevels['singularity_lance'] ?? 0) > 0) {
     drillVisualTier = 3;
-  } else if ((ownedLevels['glacier_bore_2'] ?? 0) > 0 || (ownedLevels['diamond_auger_1'] ?? 0) > 0) {
+  } else if ((ownedLevels['glacier_bore'] ?? 0) > 0 || (ownedLevels['cryo_auger'] ?? 0) > 0) {
     drillVisualTier = 2;
-  } else if ((ownedLevels['twin_bore_1'] ?? 0) > 0 || (ownedLevels['carbide_teeth'] ?? 0) > 0) {
+  } else if ((ownedLevels['drill_width'] ?? 0) > 0 || (ownedLevels['drill_power'] ?? 0) >= 3) {
     drillVisualTier = 1;
   }
 
   let hullPlatingLevel = 0;
-  if ((ownedLevels['void_cooling_3'] ?? 0) > 0 || (ownedLevels['cryo_heater_1'] ?? 0) > 0) {
+  if ((ownedLevels['void_jacket'] ?? 0) > 0 || (ownedLevels['cryo_heater'] ?? 0) > 0) {
     hullPlatingLevel = 2;
-  } else if ((ownedLevels['fuel_tank_1'] ?? 0) >= 2 || (ownedLevels['fuel_injector_1'] ?? 0) >= 1) {
+  } else if ((ownedLevels['fuel_tank'] ?? 0) >= 3 || (ownedLevels['fuel_injector'] ?? 0) >= 1) {
     hullPlatingLevel = 1;
   }
 
   let cargoPodLevel = 0;
-  if ((ownedLevels['quantum_cargo_2'] ?? 0) > 0) {
+  if ((ownedLevels['cargo_matrix'] ?? 0) > 0) {
     cargoPodLevel = 3;
-  } else if ((ownedLevels['deep_cargo_1'] ?? 0) > 0) {
+  } else if ((ownedLevels['cargo_bay'] ?? 0) >= 5) {
     cargoPodLevel = 2;
-  } else if ((ownedLevels['cargo_rack_1'] ?? 0) > 0) {
+  } else if ((ownedLevels['cargo_bay'] ?? 0) > 0) {
     cargoPodLevel = 1;
   }
 
-  const hasScannerDish = (ownedLevels['deep_radar_1'] ?? 0) > 0 || (ownedLevels['deep_radar_2'] ?? 0) > 0;
+  const hasScannerDish = (ownedLevels['scanner'] ?? 0) > 0 || (ownedLevels['deep_sonar'] ?? 0) > 0;
 
   return {
     drillPower,
@@ -882,7 +778,7 @@ export function computePlayerStats(ownedLevels: Record<string, number>): Compute
     fuelCellRestorePct: 18 * (1 + fuelCellBonusPct / 100),
     cryoHazardReduction: Math.min(1, cryoShieldPct / 100),
     voidHazardReduction: Math.min(1, voidShieldPct / 100),
-    maxCargo: 18 + cargoCapFlat,
+    maxCargo: 16 + cargoCapFlat,
     oreValueMultiplier: 1 + oreValuePct / 100,
     doubleOreChance: Math.min(0.9, doubleOreChance),
     moveSpeed: 185 * (1 + moveSpeedPct / 100),

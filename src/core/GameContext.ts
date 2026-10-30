@@ -1,5 +1,6 @@
 import { PLANETS, PlanetConfig } from '../config/planets';
 import { computePlayerStats, ComputedPlayerStats } from '../config/skillTree';
+import { refundLegacyUpgrades } from '../config/legacyTree';
 import { SpriteAtlas } from '../assets/spriteGenerator';
 import { ParticleSystem } from '../game/ParticleSystem';
 import { SoundManager } from '../game/SoundManager';
@@ -20,6 +21,7 @@ export class GameContext {
 
   constructor() {
     this.save = PortalSDK.loadSave();
+    if (refundLegacyUpgrades(this.save) > 0) PortalSDK.save(this.save);
     this.stats = computePlayerStats(this.save.ownedSkills);
   }
 

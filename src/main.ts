@@ -1,3 +1,4 @@
+import './progression.css';
 import { Game } from './core/Game';
 
 window.addEventListener('DOMContentLoaded', () => {

@@ -332,7 +332,7 @@
           <nav class="hangar-nav-rail" id="hangar-nav-rail">
             <button class="hangar-nav-btn active" data-tab="grid">
               <span class="nav-icon" data-svg="grid"></span>
-              <span class="nav-label">Deep Grid</span>
+              <span class="nav-label">Upgrades</span>
             </button>
             <button class="hangar-nav-btn" data-tab="garage">
               <span class="nav-icon" data-svg="garage"></span>
@@ -348,7 +348,7 @@
             </button>
           </nav>
 
-          <!-- TAB 1: DEEP GRID (Hidden Upgrade Tree + Node Inspector) -->
+          <!-- TAB 1: UPGRADES (four upgrade tracks + card inspector) -->
           <div class="hangar-tab-pane active" id="tab-pane-grid">
             <div class="tree-canvas-container">
               <canvas id="skill-tree-canvas"></canvas>
@@ -362,13 +362,12 @@
               <div class="tree-overlay-controls">
                 <div class="tree-legend steel-chip">
                   <span class="legend-item"><i class="dot owned"></i> Owned</span>
-                  <span class="legend-item"><i class="dot available"></i> Available</span>
-                  <span class="legend-item"><i class="dot locked"></i> Prerequisite / Stage Lock</span>
-                  <span class="legend-item"><i class="dot fog"></i> Fog Frontier</span>
+                  <span class="legend-item"><i class="dot available"></i> Can buy</span>
+                  <span class="legend-item"><i class="dot locked"></i> Needs more depth</span>
                 </div>
                 <button id="btn-center-tree" class="mini-btn">
                   <span class="inline-svg" data-svg="compass"></span>
-                  <span>Center Grid</span>
+                  <span>Back to Top</span>
                 </button>
               </div>
             </div>
@@ -408,7 +407,7 @@
                     <div class="garage-eyebrow">MARK I–IV MODULAR EXCAVATOR</div>
                     <h2 id="garage-chassis-title">MK-I PROSPECTOR RIG</h2>
                   </div>
-                  <span class="garage-hint-pill">Click any component slot to upgrade in Deep Grid</span>
+                  <span class="garage-hint-pill">Click any component slot to see its upgrades</span>
                 </div>
                 <div class="garage-canvas-wrap">
                   <canvas id="garage-pod-canvas" width="460" height="360"></canvas>
@@ -427,7 +426,7 @@
             <div class="planet-map-container">
               <div class="planet-map-header">
                 <h2>PLANETARY EXCAVATION SECTORS</h2>
-                <p>Shatter the Planetary Core at the bottom of each world to unlock the next sector and its Stage-Locked Deep Grid tech.</p>
+                <p>Shatter the Planetary Core at the bottom of each world to unlock the next sector and its upgrades.</p>
               </div>
               <div class="planet-cards-grid" id="planet-cards-grid"></div>
             </div>
@@ -500,7 +499,7 @@
           </div>
           <div class="modal-content credits-body">
             <p><strong>Core Diver: Planetary Mining Incremental</strong></p>
-            <p>Designed &amp; Engineered with HD 2D Illustrated Sprites, 7-Layer Modular Drill Rigs, 4-Bit Autotiled Strata Caverns, and the Fog-of-War Deep Grid Skill Tree.</p>
+            <p>Designed &amp; Engineered with HD 2D Illustrated Sprites, 7-Layer Modular Drill Rigs, 4-Bit Autotiled Strata Caverns, and four upgrade tracks that open as you dig deeper.</p>
             <p><strong>Worlds:</strong> Terra-Vein (800m) • Cryo-Vex (1150m) • Pyra-Void (1600m)</p>
             <p><strong>Controls:</strong> WASD / Arrow Keys / Mouse / Touch Drag to steer &amp; drill. Idle consumes 0 Fuel. Hold Space / E or the radial Extract button to surface with 100% cargo.</p>
           </div>

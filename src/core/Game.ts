@@ -176,7 +176,7 @@ export class Game {
         comboBonusCredits: pod.comboBonusCredits,
         relicCredits: pod.relicCredits,
         relicsFound: pod.relicsFound,
-        contract: this.dive.contractActive ? this.dive.contract : null,
+        contract: this.dive.contract,
         contractMetDuringDive: this.dive.contractCompleted,
       },
       planet,

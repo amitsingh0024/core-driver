@@ -1,17 +1,32 @@
 import { ORES } from '../config/ores';
 import { PlanetConfig, StratumConfig } from '../config/planets';
-import { ComputedPlayerStats } from '../config/skillTree';
+import { ComputedPlayerStats, SKILL_NODE_MAP, buyableUpgrades } from '../config/skillTree';
+import { SaveState } from '../sdk/PortalSDK';
 
 export type ContractKind = 'depth' | 'ore' | 'haul';
 
-/** One optional goal per dive, paid as a bonus on the Results screen. */
+/**
+ * A work order: one goal at a time that can take several dives. Ore and haul orders bank
+ * progress from every dive; depth orders must be met in a single dive. The reward is usually a
+ * free level of the upgrade the player is saving for, so orders feed progression directly.
+ */
 export interface DiveContract {
   kind: ContractKind;
   label: string;
   target: number;
   oreId?: string;
+  /** Credits paid on completion (0 when the reward is an upgrade level). */
   reward: number;
+  /** A free level of this upgrade on completion. */
+  rewardNodeId?: string;
+  rewardLabel: string;
+  /** Ore delivered or credits hauled on earlier dives. */
+  progress: number;
+  planet: number;
 }
+
+/** No work orders on the first dives, while the player learns to steer and extract. */
+export const FIRST_WORK_ORDER_DIVE = 2;
 
 export interface ContractProgress {
   maxDepthReached: number;
@@ -40,19 +55,33 @@ function avgOreValue(stratum: StratumConfig): number {
   return weight > 0 ? total / weight : 5;
 }
 
+/** Picks the reward: a free level of the cheapest upgrade the player can't afford yet. */
+function pickReward(save: SaveState, fallbackCredits: number): Pick<DiveContract, 'reward' | 'rewardNodeId' | 'rewardLabel'> {
+  const options = buyableUpgrades(save).sort((a, b) => a.cost - b.cost);
+  const pick = options.find((o) => o.cost > save.cash) ?? options[0];
+  if (pick) {
+    const node = SKILL_NODE_MAP[pick.id];
+    const lv = (save.ownedSkills[pick.id] ?? 0) + 1;
+    return { reward: 0, rewardNodeId: pick.id, rewardLabel: `Free ${node.name} Lv ${lv}` };
+  }
+  const reward = niceRound(fallbackCredits);
+  return { reward, rewardLabel: `+$${reward.toLocaleString()}` };
+}
+
 /**
- * Rolls a contract scaled to the player's record on this planet. Targets sit a little past
- * what the player has already done, so most contracts are reachable with one good dive.
+ * Rolls a work order scaled to the player's record on this planet. Ore and haul orders take
+ * about two to three dives; depth orders sit a little past the best depth.
  */
 export function rollContract(
   planet: PlanetConfig,
-  bestDepth: number,
+  save: SaveState,
   stats: ComputedPlayerStats,
   rand: () => number = Math.random
 ): DiveContract {
+  const bestDepth = save.deepestByPlanet[planet.id] ?? 0;
   const kinds: ContractKind[] = ['depth', 'ore', 'haul'];
   const depthCap = planet.maxDepth - 40;
-  const depthTarget = niceRound(Math.min(depthCap, Math.max(60, bestDepth + 40 + rand() * 60)));
+  const depthTarget = niceRound(Math.min(depthCap, Math.max(60, bestDepth + 30 + rand() * 50)));
   // Once the core is in reach there is no further depth to chase
   const pool = bestDepth >= depthCap ? kinds.filter((k) => k !== 'depth') : kinds;
   const kind = pool[Math.floor(rand() * pool.length)];
@@ -60,53 +89,60 @@ export function rollContract(
   const workDepth = Math.max(20, Math.min(depthCap, bestDepth * 0.8));
   const stratum = stratumAt(planet, workDepth);
   const valueMult = stats.oreValueMultiplier;
+  const diveHaul = avgOreValue(stratum) * stats.maxCargo * valueMult;
+  const reward = pickReward(save, diveHaul * 1.2);
 
   if (kind === 'depth') {
-    const deepStratum = stratumAt(planet, depthTarget);
-    return {
-      kind,
-      label: `Reach ${depthTarget}m`,
-      target: depthTarget,
-      reward: niceRound(avgOreValue(deepStratum) * 5 * valueMult),
-    };
+    return { kind, label: `Reach ${depthTarget}m`, target: depthTarget, progress: 0, planet: planet.id, ...reward };
   }
 
   if (kind === 'ore') {
     const oreIds = Object.keys(stratum.oreWeights);
     const oreId = oreIds[Math.floor(rand() * oreIds.length)];
     const ore = ORES[oreId];
-    const count = 3 + Math.floor(rand() * 4);
-    return {
-      kind,
-      label: `Mine ${count} ${ore.name}`,
-      target: count,
-      oreId,
-      reward: niceRound(ore.value * count * 0.75 * valueMult),
-    };
+    let weight = 0;
+    for (const w of Object.values(stratum.oreWeights)) weight += w;
+    const share = stratum.oreWeights[oreId] / weight;
+    const count = Math.max(4, Math.round(stats.maxCargo * share * (1.2 + rand() * 0.6)));
+    return { kind, label: `Deliver ${count} ${ore.name}`, target: count, oreId, progress: 0, planet: planet.id, ...reward };
   }
 
-  const haulTarget = niceRound(avgOreValue(stratum) * stats.maxCargo * 0.6 * valueMult);
+  const haulTarget = niceRound(diveHaul * (1.2 + rand() * 0.6));
   return {
     kind,
-    label: `Haul $${haulTarget.toLocaleString()}`,
+    label: `Sell $${haulTarget.toLocaleString()} of ore`,
     target: haulTarget,
-    reward: niceRound(haulTarget * 0.35),
+    progress: 0,
+    planet: planet.id,
+    ...reward,
   };
 }
 
-/** Progress toward the target, 0..1. */
+/** The active work order, rolling a new one when there is none for this planet. */
+export function currentWorkOrder(save: SaveState, planet: PlanetConfig, stats: ComputedPlayerStats): DiveContract | null {
+  if (save.totalDives < FIRST_WORK_ORDER_DIVE) return null;
+  if (!save.workOrder || save.workOrder.planet !== planet.id) {
+    save.workOrder = rollContract(planet, save, stats);
+  }
+  return save.workOrder;
+}
+
+/** This dive's contribution to the order (before any fuel-out loss). */
+function diveValue(c: DiveContract, p: ContractProgress): number {
+  if (c.kind === 'depth') return p.maxDepthReached;
+  if (c.kind === 'ore') return p.cargoManifest[c.oreId ?? ''] ?? 0;
+  return p.haulValue;
+}
+
+/** Progress toward the target, 0..1, counting earlier dives. */
 export function contractProgress(c: DiveContract, p: ContractProgress): number {
-  const value =
-    c.kind === 'depth'
-      ? p.maxDepthReached
-      : c.kind === 'ore'
-      ? p.cargoManifest[c.oreId ?? ''] ?? 0
-      : p.haulValue;
+  const value = c.kind === 'depth' ? diveValue(c, p) : c.progress + diveValue(c, p);
   return Math.max(0, Math.min(1, value / c.target));
 }
 
 export function contractProgressText(c: DiveContract, p: ContractProgress): string {
   if (c.kind === 'depth') return `${Math.min(p.maxDepthReached, c.target)} / ${c.target}m`;
-  if (c.kind === 'ore') return `${Math.min(p.cargoManifest[c.oreId ?? ''] ?? 0, c.target)} / ${c.target}`;
-  return `$${Math.min(p.haulValue, c.target).toLocaleString()} / $${c.target.toLocaleString()}`;
+  const value = Math.min(c.progress + diveValue(c, p), c.target);
+  if (c.kind === 'ore') return `${value} / ${c.target}`;
+  return `$${value.toLocaleString()} / $${c.target.toLocaleString()}`;
 }

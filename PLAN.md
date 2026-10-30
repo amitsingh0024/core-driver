@@ -20,17 +20,10 @@
    - Stage Hazard: Superheated high-gravity mantle requires **Void Cooling Jacket** & **Singularity Bore** nodes.
    - Ores: Brimstone Uranium (`$65,000`), Magma Ruby (`$160,000`), Astral Mythril (`$420,000`), Abyssal Painite (`$1,100,000`), Singularity Matter (`$3,000,000`).
 
-## 2. Hidden Skill Tree ("The Deep Grid")
-- **5 Branches:**
-  1. Drill Power & Head Geometry (DPS, Hardness Penetration, Drill Width Tiers, Core-Breaker)
-  2. Fuel Systems & Thermal Shielding (Max Fuel, Passive Burn Efficiency, Friction Lube, Fuel Cell Yield, Planet Hazard Shields)
-  3. Cargo Hold & Ore Refinery (Cargo Capacity, Ore Compression, Refinery Value Multipliers, Double-Ore Chance)
-  4. Thrusters, Winch & Deep Scanner (Dive Speed, Steering Agility, Winch Speed, Blackbox Loss Reduction, Fuel Radar)
-  5. Autonomous Mining Drones (Unlockable mid-tree branch spawning orbiting laser mining drones)
-- **Lock Types:**
-  - Single prerequisite (`requires: [nodeId]`)
-  - Multi-node prerequisite (`requiresAll: [id1, id2, id3]` or `requiresCount: { nodes: [...], count: 3 }`)
-  - Planet stage lock (`minPlanet: 2` or `minPlanet: 3`)
+## 2. Upgrade Tracks (replaces the Deep Grid, Oct 2026)
+- **Four tracks**, each a short column of cards: **Fuel** (open from the start), **Cargo** (opens at 50 m), **Drill** (120 m), **Systems** (200 m). Tracks open on first reaching that depth on Terra-Vein.
+- **Cards** have 1 to 10 levels. On each planet a track has 2 to 4 cards; later cards wait on a depth on that planet ("Reach 280 m"). There are no buy-these-3-first gates.
+- Config lives in `config/skillTree.ts` (`UPGRADE_TRACKS`, `SKILL_NODES` with `tier`, `unlockDepth`, `perLevel`). Old Deep Grid saves are refunded in full on load (`config/legacyTree.ts`).
 
 ## 3. Gameplay Pass (Oct 2026)
 Goal: every dive should feel chunky, have a target, and hold one surprise. Based on the miner-game research doc.
@@ -99,3 +92,19 @@ Ore used to be a per-tile dice roll, which read as noise. It is now grown as vei
 - **Depth bands:** inside a stratum, common ores lean toward the top and rare ores toward the bottom.
 - **Starter seam:** a guaranteed seam of the first ore crosses the launch shaft.
 - `npm run ore-report` prints ore share, cluster size and per-ore counts per stratum; `npm run ore-report -- --map 1 42` prints an ASCII map.
+
+## 9. Core Loop Rework (Oct 2026)
+Goal: an early dive pays for about one upgrade, every session has a named next goal, and depth is the income ladder. Measured with `npm run pacing`, a headless bot that plays whole campaigns with the real `DrillPod`, `DiveWorld` and payout code and buys the cheapest upgrade it can.
+
+- **Starter rig:** fuel 100 → 35 (about 11 seconds of drilling), cargo 18 → 16.
+- **Depth milestones** (`config/milestones.ts`): reaching 50, 120, 200, 280, 380, 480 and 680 m on Terra-Vein (and set depths on later planets) for the first time pays a one-off bonus and opens a track or cards. The upgrade screen and Results screen show the next goal.
+- **Work orders replace per-dive contracts:** one order at a time, saved in `save.workOrder`. Ore and haul orders bank progress over about 2 to 3 dives; depth orders need one dive. The reward is a free level of the upgrade the player is saving for. None on the first 2 dives.
+- **Full hold swaps ore:** with a full hold, a richer ore replaces the cheapest one, so going deeper still pays.
+- **Deep strata** on Terra-Vein, Cryo-Vex and Pyra-Void are a little softer, so a maxed rig for that planet can reach its core.
+
+| Bot, 4 seeds | Before | After |
+|---|---|---|
+| First 5 dives | ~51 s, ~$2,100, ~11 upgrades each | ~24 s, ~$160, ~1 upgrade each |
+| Terra-Vein | every upgrade bought by dive 5, then ~40 dives with nothing to buy | 41 dives, ~71 min, longest stretch without a purchase ~2 dives |
+| Cryo-Vex / Pyra-Void | upgrades all bought on arrival, then stuck | ~102 min / ~104 min |
+| Whole game | stalls on Cryo-Vex | ~4.6 hours over ~89 dives |
