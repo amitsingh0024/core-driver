@@ -1,4 +1,5 @@
 import { GameContext } from '../core/GameContext';
+import { GameSettings, PortalSDK } from '../sdk/PortalSDK';
 import { SVG_ICONS } from '../ui/svgIcons';
 import { $ } from '../ui/dom';
 
@@ -7,6 +8,8 @@ type SliderKey = 'sfxVolume' | 'musicVolume';
 
 /** Renders the settings form into both the hangar Settings tab and the pause modal. */
 export class SettingsForm {
+  private confirmReset = false;
+
   constructor(private game: GameContext) {
     $('btn-mute').addEventListener('click', () => {
       const s = this.game.save.settings;
@@ -32,6 +35,14 @@ export class SettingsForm {
     const s = this.game.save.settings;
     const toggle = (key: ToggleKey) =>
       `<button class="toggle-btn ${s[key] ? 'on' : ''}" data-toggle="${key}">${s[key] ? 'ON' : 'OFF'}</button>`;
+
+    const langs: GameSettings['language'][] = ['EN', 'ES', 'FR', 'DE'];
+    const langButtons = langs
+      .map(
+        (l) =>
+          `<button class="toggle-btn ${s.language === l ? 'on' : ''}" data-lang="${l}">${l}</button>`
+      )
+      .join('');
 
     for (const id of ['hangar-settings-form', 'pause-settings-form']) {
       const container = document.getElementById(id);
@@ -61,7 +72,7 @@ export class SettingsForm {
         <div class="setting-row">
           <div class="setting-label-group">
             <span class="setting-title">Colorblind-Friendly Node Shapes</span>
-            <span class="setting-sub">State glyphs on Deep Grid nodes (owned, buyable, locked)</span>
+            <span class="setting-sub">State glyphs on upgrade cards (owned, buyable, locked)</span>
           </div>
           ${toggle('colorblindMode')}
         </div>
@@ -78,6 +89,22 @@ export class SettingsForm {
             <span class="setting-sub">Turns off shake and flashes, and shortens screen transitions</span>
           </div>
           ${toggle('reducedMotion')}
+        </div>
+        <div class="setting-row">
+          <div class="setting-label-group">
+            <span class="setting-title">Language</span>
+            <span class="setting-sub">Interface localization language</span>
+          </div>
+          <div class="lang-btn-group">${langButtons}</div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label-group">
+            <span class="setting-title">Save Data</span>
+            <span class="setting-sub">Reset all planetary progress, credits, and Deep Grid nodes</span>
+          </div>
+          <button class="toggle-btn danger-btn" data-reset-save="true">
+            ${this.confirmReset ? 'CONFIRM WIPE?' : 'RESET SAVE'}
+          </button>
         </div>
       `;
 
@@ -97,6 +124,27 @@ export class SettingsForm {
           const key = btn.dataset.toggle as ToggleKey;
           s[key] = !s[key];
           this.game.persist();
+          this.applyToRuntime();
+          this.render();
+        });
+      });
+      container.querySelectorAll<HTMLButtonElement>('[data-lang]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          s.language = btn.dataset.lang as GameSettings['language'];
+          this.game.persist();
+          this.render();
+        });
+      });
+      container.querySelectorAll<HTMLButtonElement>('[data-reset-save]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (!this.confirmReset) {
+            this.confirmReset = true;
+            this.render();
+            return;
+          }
+          this.confirmReset = false;
+          this.game.save = PortalSDK.resetSave();
+          this.game.refreshStats();
           this.applyToRuntime();
           this.render();
         });

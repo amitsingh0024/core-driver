@@ -1,6 +1,7 @@
 import { ORES } from '../config/ores';
+import { DepthMilestone, milestonesCrossed } from '../config/milestones';
 import { PLANETS, PlanetConfig } from '../config/planets';
-import { ComputedPlayerStats } from '../config/skillTree';
+import { ComputedPlayerStats, SKILL_NODE_MAP, getNodeNextCost } from '../config/skillTree';
 import { SaveState } from '../sdk/PortalSDK';
 import { DiveEndReason } from './DrillPod';
 import { DiveContract } from './DiveContract';
@@ -30,8 +31,12 @@ export interface DivePayout {
   bonuses: BonusRow[];
   contract: DiveContract | null;
   contractCompleted: boolean;
+  /** What a completed work order paid, e.g. "Free Fuel Tank Lv 3". */
+  contractReward: string | null;
   unlockedNextPlanet: boolean;
   isNewBestDepth: boolean;
+  /** Depth goals reached for the first time on this dive; their bonuses are in `bonuses`. */
+  milestones: DepthMilestone[];
   maxDepth: number;
   totalEarned: number;
 }
@@ -104,12 +109,38 @@ export function settleDive(
 
   const contract = outcome.contract ?? null;
   let contractCompleted = false;
+  let contractReward: string | null = null;
   if (contract) {
-    contractCompleted =
-      contract.kind === 'haul' ? oreValue + comboKept >= contract.target : !!outcome.contractMetDuringDive;
+    // Ore and haul orders bank what this dive actually sold; depth orders need one dive
+    const delivered =
+      contract.kind === 'ore'
+        ? rows.find((r) => r.oreId === contract.oreId)?.kept ?? 0
+        : contract.kind === 'haul'
+        ? oreValue + comboKept
+        : 0;
+    contract.progress += delivered;
+    contractCompleted = contract.kind === 'depth' ? !!outcome.contractMetDuringDive : contract.progress >= contract.target;
     if (contractCompleted) {
-      bonuses.push({ label: `Contract: ${contract.label}`, amount: contract.reward, color: '#69f0ae' });
+      contractReward = contract.rewardLabel;
+      const node = contract.rewardNodeId ? SKILL_NODE_MAP[contract.rewardNodeId] : undefined;
+      const lv = node ? save.ownedSkills[node.id] ?? 0 : 0;
+      if (node && lv < node.maxLevel) {
+        save.ownedSkills[node.id] = lv + 1;
+      } else {
+        // The upgrade maxed out meanwhile, so pay what that level would have cost
+        const credits = node ? getNodeNextCost(node, node.maxLevel - 1) : contract.reward;
+        bonuses.push({ label: `Work order: ${contract.label}`, amount: credits, color: '#69f0ae' });
+        contractReward = `+$${credits.toLocaleString()}`;
+      }
+      save.workOrder = null;
+    } else {
+      save.workOrder = contract;
     }
+  }
+
+  const milestones = milestonesCrossed(planet.id, prevBest, outcome.maxDepthReached);
+  for (const m of milestones) {
+    bonuses.push({ label: `Milestone: reached ${m.depth}m`, amount: m.reward, color: '#00f0ff' });
   }
 
   if (coreBonus > 0) bonuses.push({ label: `${planet.coreName} Bounty`, amount: coreBonus, color: '#ffd54f' });
@@ -126,8 +157,10 @@ export function settleDive(
     bonuses,
     contract,
     contractCompleted,
+    contractReward,
     unlockedNextPlanet,
     isNewBestDepth,
+    milestones,
     maxDepth: outcome.maxDepthReached,
     totalEarned,
   };

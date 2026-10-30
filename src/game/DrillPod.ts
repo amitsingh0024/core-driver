@@ -13,6 +13,7 @@ export interface DiveEvent {
   x: number;
   y: number;
   color?: string;
+  oreId?: string;
 }
 
 export interface ActiveDroneBeam {
@@ -56,6 +57,8 @@ export class DrillPod {
   public relicsFound = 0;
   /** Charges from drilled Extraction Beacons; holding Extract with one skips the winch wait. */
   public beaconCharges = 0;
+  public lastMinedOreId: string | null = null;
+  public lastMinedOreTime = 0;
   public events: DiveEvent[] = [];
 
   constructor(stats: ComputedPlayerStats) {
@@ -235,6 +238,17 @@ export class DrillPod {
     const moveStep = stats.moveSpeed * speedMultiplier * dt;
     this.x += dirX * moveStep;
     this.y = Math.max(16, this.y + dirY * moveStep);
+
+    // Spawn world-space thruster exhaust smoke trail behind the top nozzle
+    if (Math.random() < (this.fuel / this.maxFuel < 0.2 ? 0.65 : 0.35)) {
+      particles.spawnExhaustSmoke(
+        this.x - dirX * 15,
+        this.y - dirY * 15,
+        -dirX * 32,
+        -dirY * 32,
+        this.fuel / this.maxFuel < 0.2
+      );
+    }
 
     const minWorldX = TILE_SIZE * 1.5;
     const maxWorldX = (WORLD_COLS - 1.5) * TILE_SIZE;
@@ -426,6 +440,7 @@ export class DrillPod {
       x: bx,
       y: by,
       color: oreCfg?.highlightColor,
+      oreId: oreCfg?.id,
     });
 
     if (oreCfg) {
@@ -443,6 +458,8 @@ export class DrillPod {
         const qty = Math.min(spaceLeft, isDouble ? 2 : 1);
         this.cargoUsed += qty;
         this.cargoManifest[oreCfg.id] = (this.cargoManifest[oreCfg.id] ?? 0) + qty;
+        this.lastMinedOreId = oreCfg.id;
+        this.lastMinedOreTime = this.animTime;
 
         const comboMult = this.comboCount > 1 ? 1 + (this.comboCount - 1) * 0.15 : 1;
         const baseVal = Math.round(oreCfg.value * stats.oreValueMultiplier);
@@ -459,7 +476,17 @@ export class DrillPod {
         );
         sound.playOrePickup(oreCfg.tier, isDouble || this.comboCount > 1);
       } else {
-        particles.addFloatingText(bx, by - 6, 'CARGO FULL!', '#ff5252', 0.95);
+        // Full hold: a richer ore pushes out the cheapest one, so going deeper still pays
+        const cheapest = this.cheapestHeldOre();
+        if (cheapest && ORES[cheapest].value < oreCfg.value) {
+          this.cargoManifest[cheapest]--;
+          if (this.cargoManifest[cheapest] <= 0) delete this.cargoManifest[cheapest];
+          this.cargoManifest[oreCfg.id] = (this.cargoManifest[oreCfg.id] ?? 0) + 1;
+          particles.addFloatingText(bx, by - 6, `SWAP +${oreCfg.name}`, oreCfg.highlightColor, 1.0, `dumped ${ORES[cheapest].name}`);
+          sound.playOrePickup(oreCfg.tier, false);
+        } else {
+          particles.addFloatingText(bx, by - 6, 'CARGO FULL!', '#ff5252', 0.95);
+        }
       }
     }
 
@@ -467,5 +494,13 @@ export class DrillPod {
     b.oreId = null;
     b.armored = false;
     b.hp = 0;
+  }
+
+  private cheapestHeldOre(): string | null {
+    let best: string | null = null;
+    for (const [oreId, count] of Object.entries(this.cargoManifest)) {
+      if (count > 0 && (!best || ORES[oreId].value < ORES[best].value)) best = oreId;
+    }
+    return best;
   }
 }

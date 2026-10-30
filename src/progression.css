@@ -1,0 +1,45 @@
+/* Depth milestone banner on the Results screen */
+.results-milestone {
+  margin: 6px 0 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: rgba(0, 240, 255, 0.08);
+  font-family: var(--font-body);
+}
+
+.results-milestone[data-kind='reached'] {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
+}
+
+.results-milestone-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  letter-spacing: 0.04em;
+}
+
+.results-milestone-sub {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cream);
+}
+
+.results-milestone-next {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cream-dim);
+}
+
+.results-milestone-next span {
+  margin-left: 6px;
+  color: var(--neon-gold);
+}
+
+/* The upgrade screen's top row is the Next Goal bar, so the Foreman hint sits above the bottom controls */
+#tab-pane-grid .hangar-coach {
+  top: auto;
+  bottom: 70px;
+}

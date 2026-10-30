@@ -5,7 +5,7 @@ import { DiveInput } from '../core/Input';
 import { DiveWorld } from '../game/DiveWorld';
 import { DrillPod } from '../game/DrillPod';
 import { GameFeel } from '../game/GameFeel';
-import { DiveContract, ContractProgress, contractProgress, contractProgressText, rollContract } from '../game/DiveContract';
+import { DiveContract, ContractProgress, contractProgress, contractProgressText, currentWorkOrder } from '../game/DiveContract';
 import { DiveRenderer } from '../render/DiveRenderer';
 import { PortalSDK } from '../sdk/PortalSDK';
 import { $, setStyle, setText } from '../ui/dom';
@@ -17,10 +17,9 @@ export class DiveScreen {
   public pod: DrillPod;
   public isPaused = false;
   public readonly feel = new GameFeel();
-  public contract!: DiveContract;
+  public contract: DiveContract | null = null;
   public contractCompleted = false;
   /** Work orders stay off for a new player's first dives so the HUD only teaches the core loop. */
-  public contractActive = false;
   private canvas = $<HTMLCanvasElement>('dive-canvas');
   private lowFuelVignette = $('low-fuel-vignette');
   private coarsePointer = window.matchMedia?.('(pointer: coarse)');
@@ -36,6 +35,7 @@ export class DiveScreen {
   private recordToastShown = false;
   private cargoToastShown = false;
   private startBestDepth = 0;
+  private displayedHaulValue = 0;
   private coach = { active: false, shown: new Set<string>(), timer: 0, elapsed: 0 };
 
   constructor(
@@ -76,6 +76,8 @@ export class DiveScreen {
     $('pause-modal').classList.toggle('hidden', !paused);
     if (paused) {
       this.input.clear();
+      const totalCredsEl = document.getElementById('pause-total-credits');
+      if (totalCredsEl) totalCredsEl.textContent = `$${this.game.save.cash.toLocaleString()}`;
       this.onPauseOpened();
     }
   }
@@ -89,14 +91,18 @@ export class DiveScreen {
     this.pod = new DrillPod(this.game.stats);
     this.game.particles.clear();
     this.feel.clear();
-    this.contract = rollContract(planet, this.game.save.deepestByPlanet[planet.id] ?? 0, this.game.stats);
-    this.contractActive = isUnlocked(this.game.save, 'fullHud');
+    // Work orders appear with the full HUD, after the first dives
+    this.contract = isUnlocked(this.game.save, 'fullHud') ? currentWorkOrder(this.game.save, planet, this.game.stats) : null;
     this.contractCompleted = false;
     $('hud-contract').classList.remove('done');
-    $('hud-contract-label').textContent = this.contract.label;
-    $('hud-contract-reward').textContent = `+$${this.contract.reward.toLocaleString()}`;
+    $('hud-contract').classList.toggle('hidden', !this.contract);
+    if (this.contract) {
+      $('hud-contract-label').textContent = this.contract.label;
+      $('hud-contract-reward').textContent = this.contract.rewardLabel;
+    }
     this.endTransitionTimer = 0;
     this.finished = false;
+    this.displayedHaulValue = 0;
     this.currentStratumId = planet.strata[0].id;
     this.stratumBannerTimer = 0;
     $('stratum-banner').classList.remove('show');
@@ -319,8 +325,8 @@ export class DiveScreen {
       },
       {
         id: 'contract',
-        when: this.contractActive && coach.elapsed > 1.2,
-        text: 'Each dive comes with a CONTRACT at the top of the screen. Finish it for a bonus payout.',
+        when: coach.elapsed > 1.2 && this.contract !== null,
+        text: 'This is your WORK ORDER. It can take a few dives; finish it for a free upgrade.',
       },
       {
         id: 'ore',
@@ -348,14 +354,14 @@ export class DiveScreen {
   }
 
   private checkContract(): void {
-    if (!this.contractActive || this.contractCompleted) return;
+    if (this.contractCompleted || !this.contract) return;
     if (contractProgress(this.contract, this.contractState()) < 1) return;
-    // A haul contract only counts once it's safely extracted, so it is settled at the end instead
-    if (this.contract.kind === 'haul') return;
+    // Ore and haul orders count what is sold, so they settle at the end instead
+    if (this.contract.kind !== 'depth') return;
     this.contractCompleted = true;
     $('hud-contract').classList.add('done');
     this.game.sound.playContractComplete();
-    this.game.particles.addFloatingText(this.pod.x, this.pod.y - 40, 'CONTRACT COMPLETE!', '#69f0ae', 1.25, `+$${this.contract.reward.toLocaleString()}`);
+    this.game.particles.addFloatingText(this.pod.x, this.pod.y - 40, 'WORK ORDER DONE!', '#69f0ae', 1.25, this.contract.rewardLabel);
   }
 
   /** HUD elements looked up once; the HUD updates every frame. */
@@ -379,7 +385,11 @@ export class DiveScreen {
     markerBest: $('depth-marker-best'),
     extractBtn: $('btn-hold-extract'),
     extractRing: $('extract-radial-circle'),
+    lastOreCanvas: $('hud-last-ore-canvas') as HTMLCanvasElement,
+    haulPill: $('hud-haul-pill'),
+    depthReadout: $('depth-pod-readout'),
   };
+  private lastDrawnOreId: string | null | undefined = undefined;
 
   private updateDiveHUD(): void {
     const hud = this.hud;
@@ -401,6 +411,7 @@ export class DiveScreen {
     setStyle(hud.fuelFill, 'width', `${fuelPct.toFixed(1)}%`);
 
     const level = fuelPct <= 25 ? 'low' : fuelPct <= 40 ? 'warn' : 'ok';
+    hud.fuelFill.classList.toggle('burning', this.pod.isMoving || this.pod.isDrilling);
     hud.fuelWrapper.classList.toggle('low-fuel', level === 'low');
     hud.fuelWrapper.classList.toggle('warn-fuel', level === 'warn');
     hud.fuelWarning.classList.toggle('hidden', level !== 'low');
@@ -414,26 +425,50 @@ export class DiveScreen {
         : 'linear-gradient(180deg, #b6f27a 0%, #5cb83a 45%, #2f7a1f 100%)'
     );
 
-    // Cargo Hold + Mini Fill Bar + Full Flash
+    // Cargo Hold + Mini Fill Bar + Last Mined Ore Gem + Full Flash
     setText(hud.cargoText, `${this.pod.cargoUsed} / ${this.pod.maxCargo}`);
     const cargoPct = Math.min(100, (this.pod.cargoUsed / Math.max(1, this.pod.maxCargo)) * 100);
     setStyle(hud.cargoMiniFill, 'width', `${cargoPct.toFixed(1)}%`);
     hud.cargoPill.classList.toggle('cargo-full', this.pod.cargoUsed >= this.pod.maxCargo);
+    hud.cargoPill.classList.toggle('cargo-catch-pop', this.feel.cargoCatchPulse > 0.35);
 
-    const haulText = `$${(this.haulValue() + this.pod.relicCredits).toLocaleString()}`;
+    // The gem icon only changes when a different ore is mined
+    if (this.pod.lastMinedOreId !== this.lastDrawnOreId) {
+      this.lastDrawnOreId = this.pod.lastMinedOreId;
+      const lctx = hud.lastOreCanvas.getContext('2d');
+      if (lctx) {
+        lctx.clearRect(0, 0, hud.lastOreCanvas.width, hud.lastOreCanvas.height);
+        const gem = this.pod.lastMinedOreId ? this.game.atlas.oreOverlays.get(this.pod.lastMinedOreId) : undefined;
+        if (gem) lctx.drawImage(gem, 1, 1, 18, 18);
+      }
+    }
+
+    // Haul value ticks up toward its target instead of jumping
+    const targetHaul = this.haulValue() + this.pod.relicCredits;
+    if (this.displayedHaulValue < targetHaul) {
+      const step = Math.max(1, Math.ceil((targetHaul - this.displayedHaulValue) * 0.22));
+      this.displayedHaulValue = Math.min(targetHaul, this.displayedHaulValue + step);
+    } else {
+      this.displayedHaulValue = targetHaul;
+    }
+    const haulText = `$${this.displayedHaulValue.toLocaleString()}`;
     setText(hud.haulValue, haulText);
     setText(hud.cargoCash, haulText);
+    hud.haulPill.classList.toggle('haul-ticking', this.displayedHaulValue < targetHaul);
 
-    const progress = this.contractState();
-    setText(hud.contractProgress, contractProgressText(this.contract, progress));
-    const pct = contractProgress(this.contract, progress);
-    setStyle(hud.contractFill, 'width', `${Math.round(pct * 100)}%`);
-    // Haul contracts settle on extraction, so show them as ready rather than paid
-    if (this.contract.kind === 'haul') hud.contract.classList.toggle('done', pct >= 1);
+    if (this.contract) {
+      const progress = this.contractState();
+      setText(hud.contractProgress, contractProgressText(this.contract, progress));
+      const pct = contractProgress(this.contract, progress);
+      setStyle(hud.contractFill, 'width', `${Math.round(pct * 100)}%`);
+      // Ore and haul orders settle on extraction, so show them as ready rather than paid
+      if (this.contract.kind !== 'depth') hud.contract.classList.toggle('done', pct >= 1);
+    }
 
     // Vertical Depth Meter Markers
     const depthPct = Math.min(100, (this.pod.depthMeters / planet.maxDepth) * 100);
     setStyle(hud.markerPod, 'top', `${depthPct.toFixed(1)}%`);
+    setText(hud.depthReadout, `${this.pod.depthMeters}m`);
 
     const bestDepth = Math.max(
       this.pod.maxDepthReached,
@@ -444,6 +479,7 @@ export class DiveScreen {
 
     // Circular Radial SVG Extract Progress Ring (circumference = 2 * PI * 44 = 276.46)
     hud.extractBtn.classList.toggle('beacon-charged', this.pod.beaconCharges > 0);
+    hud.extractBtn.classList.toggle('extracting', this.pod.extractProgress > 0.01);
 
     const offset = 276.46 * (1 - Math.max(0, Math.min(1, this.pod.extractProgress)));
     setStyle(hud.extractRing, 'stroke-dashoffset', `${offset.toFixed(2)}`);

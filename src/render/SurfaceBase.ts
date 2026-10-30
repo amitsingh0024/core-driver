@@ -139,6 +139,29 @@ export function drawSurfaceSky(
   drawMountains(ctx, w, groundY, camX * 0.12, theme, 150, 0.0036, 7, 0.55);
   drawMountains(ctx, w, groundY, camX * 0.3, theme, 85, 0.0068, 23, 1);
 
+  // Distant sky birds (Planet 1) or high-altitude courier drones (Planets 2 & 3), on their own parallax layer
+  for (let b = 0; b < 4; b++) {
+    const span = w + 300;
+    const bx = ((((b * 280 + time * (22 + b * 4) - camX * 0.12) % span) + span) % span) - 150;
+    const by = groundY - 250 - (b % 3) * 38 + Math.sin(time * 2.2 + b) * 6;
+    if (by < 0) continue;
+    if (planet.id === 1) {
+      const flap = Math.sin(time * 9 + b * 1.7) * 3.5;
+      ctx.strokeStyle = rgba(theme.ridge, 0.6);
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(bx - 6, by - flap);
+      ctx.quadraticCurveTo(bx - 2, by - 2, bx, by);
+      ctx.quadraticCurveTo(bx + 2, by - 2, bx + 6, by - flap);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = mix(theme.sign, '#ffffff', 0.4);
+      ctx.fillRect(bx - 4, by - 1.5, 8, 3);
+      ctx.fillStyle = rgba(theme.ground, 0.5);
+      ctx.fillRect(bx - 10, by - 0.8, 6, 1.6);
+    }
+  }
+
   ctx.restore();
 }
 
@@ -209,7 +232,8 @@ export function drawSurfaceBase(
   padX: number,
   groundY: number,
   w: number,
-  time: number
+  time: number,
+  podAtSurface = false
 ): void {
   const theme = surfaceTheme(planet.id);
   const accent = planet.accentColor;
@@ -237,6 +261,17 @@ export function drawSurfaceBase(
     const x = padX - 480 + i * 330 + dx * 0.6;
     const y = groundY - 150 - i * 40 + Math.sin(time * 2 + i) * 8;
     if (visible(x, 10)) drawSkyDrone(ctx, x, y, i % 2 ? theme.sign : accent, time + i);
+  }
+
+  // Yard workers pacing between buildings; the two nearest the pad wave when the pod is up top
+  for (let i = 0; i < 4; i++) {
+    const [from, to] = i === 0 ? [-470, -380] : i === 1 ? [230, 300] : i === 2 ? [-250, -190] : [540, 600];
+    const span = to - from;
+    const phase = (time * (22 + i * 6) + i * 97) % (span * 2);
+    const forward = phase < span;
+    const x = padX + from + (forward ? phase : span * 2 - phase);
+    const waving = podAtSurface && (i === 1 || i === 2);
+    if (visible(x, 10)) drawWorker(ctx, x, groundY, forward ? 1 : -1, time * 9 + i, i % 2 ? theme.sign : accent, waving);
   }
 
   ctx.restore();
@@ -315,6 +350,19 @@ function drawFuelStation(ctx: CanvasRenderingContext2D, x: number, g: number, t:
   ctx.fillStyle = rgba(green, 0.4 + pulse * 0.5);
   ctx.fillRect(x - 8, g - 44, 16, 10);
   neonSign(ctx, 'FUEL', x, g - 112, green, 16, time);
+
+  // Bubbling fuel sight-tube on the pump column
+  ctx.fillStyle = '#04100a';
+  ctx.fillRect(x + 22, g - 80, 7, 30);
+  neonStroke(ctx, rectPath(x + 22, g - 80, 7, 30), green, 1);
+  const fuelLvl = 18 + Math.sin(time * 2.2) * 5;
+  ctx.fillStyle = rgba(green, 0.75);
+  ctx.fillRect(x + 23, g - 51 - fuelLvl, 5, fuelLvl);
+  for (let b = 0; b < 3; b++) {
+    const by = g - 52 - ((time * 18 + b * 7) % Math.max(4, fuelLvl));
+    ctx.fillStyle = '#d6ffe6';
+    ctx.fillRect(x + 24 + (b % 2) * 2, by, 1.6, 1.6);
+  }
   void t;
 }
 
@@ -363,6 +411,37 @@ function drawDerrick(ctx: CanvasRenderingContext2D, x: number, g: number, t: Sur
   neonStroke(ctx, wheel, t.sign, 2);
   ctx.restore();
 
+  // Swaying auxiliary crane hook off the right of the crown
+  const sway = Math.sin(time * 1.8) * 5;
+  const hookLine = new Path2D();
+  hookLine.moveTo(x + 18, g - h + 2);
+  hookLine.lineTo(x + 18 + sway, g - h + 46);
+  neonStroke(ctx, hookLine, t.ridge, 1);
+  const hook = new Path2D();
+  hook.arc(x + 18 + sway, g - h + 50, 4, 0, Math.PI * 1.3);
+  neonStroke(ctx, hook, accent, 1.6);
+
+  // Rotating red warning beacon with a sweeping light cone
+  const beaconY = g - h - 34;
+  const beamDir = Math.sin(time * 3.5);
+  ctx.save();
+  ctx.translate(x, beaconY);
+  const cone = ctx.createLinearGradient(0, 0, beamDir * 60, 0);
+  cone.addColorStop(0, 'rgba(255, 46, 88, 0.4)');
+  cone.addColorStop(1, 'rgba(255, 46, 88, 0)');
+  ctx.fillStyle = cone;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(beamDir * 60, -16 * Math.abs(beamDir) - 4);
+  ctx.lineTo(beamDir * 60, 16 * Math.abs(beamDir) + 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = beamDir > -0.2 ? '#ff2e58' : '#4a0a1a';
+  ctx.beginPath();
+  ctx.arc(x, beaconY, 4, 0, Math.PI * 2);
+  ctx.fill();
+
   // Pad slabs with chevron light strips that chase toward the shaft
   for (const dir of [-1, 1]) {
     const x0 = dir < 0 ? x - 176 : x + 112;
@@ -374,10 +453,35 @@ function drawDerrick(ctx: CanvasRenderingContext2D, x: number, g: number, t: Sur
       ctx.fillStyle = lit ? mix(accent, '#ffffff', 0.4) : rgba(accent, 0.35);
       ctx.fillRect(x0 + 6 + k * 15, g - 7, 8, 4);
     }
+
+    // Hydraulic pad steam vent puffs at the shaft edge
+    const steamCycle = (time * 0.7 + (dir < 0 ? 0 : 0.5)) % 1;
+    if (steamCycle < 0.45) {
+      const p = steamCycle / 0.45;
+      const vx = dir < 0 ? x - 112 - p * 18 : x + 112 + p * 18;
+      ctx.fillStyle = `rgba(230, 220, 255, ${((1 - p) * 0.4).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(vx, g - 12 - p * 14, 3.5 + p * 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 
 function drawRefinery(ctx: CanvasRenderingContext2D, x: number, g: number, t: SurfaceTheme, accent: string, time: number): void {
+  // Smokestack behind the tall silo, puffing rising smoke rings
+  ctx.fillStyle = '#0b0620';
+  ctx.fillRect(x + 92, g - 206, 14, 36);
+  neonStroke(ctx, rectPath(x + 92, g - 206, 14, 36), accent, 1.4);
+  for (let k = 0; k < 3; k++) {
+    const p = (time * 0.45 + k * 0.33) % 1;
+    const px = x + 99 + Math.sin(time * 1.5 + k * 2) * 5 + p * 12;
+    ctx.strokeStyle = `rgba(220, 210, 255, ${((1 - p) * 0.5).toFixed(2)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(px, g - 210 - p * 40, 4 + p * 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   // Two silos and a block, joined by a conveyor carrying glowing ore
   ctx.fillStyle = '#0b0620';
   ctx.fillRect(x + 40, g - 170, 70, 170);
@@ -402,6 +506,16 @@ function drawRefinery(ctx: CanvasRenderingContext2D, x: number, g: number, t: Su
     ctx.arc(x - 30 + 70 * p, g - 74 - 80 * p, 3, 0, Math.PI * 2);
     ctx.fill();
   }
+  // Glowing molten smelter furnace window at the base of the tall silo
+  const furnace = 0.7 + Math.sin(time * 7) * 0.25 + Math.sin(time * 19) * 0.05;
+  ctx.fillStyle = '#05030e';
+  ctx.fillRect(x + 59, g - 36, 32, 20);
+  ctx.fillStyle = `rgba(255, 110, 20, ${furnace.toFixed(2)})`;
+  ctx.fillRect(x + 62, g - 33, 26, 14);
+  ctx.fillStyle = '#fff3a0';
+  ctx.fillRect(x + 67, g - 28, 16, 5);
+  neonStroke(ctx, rectPath(x + 59, g - 36, 32, 20), '#ff8a3d', 1.2);
+
   neonSign(ctx, 'ORE', x + 75, g - 188, t.sign, 16, time);
 }
 
@@ -421,6 +535,37 @@ function drawHangar(ctx: CanvasRenderingContext2D, x: number, g: number, t: Surf
     ctx.fillRect(x - 66, g - 64 + k * 11, 132, 3);
   }
   neonStroke(ctx, rectPath(x - 70, g - 70, 140, 70), t.sign, 1.4);
+
+  // Welding arc flashes and a skittering spark inside the bay
+  if (Math.sin(time * 13) > 0.35) {
+    const flash = ctx.createRadialGradient(x + Math.sin(time * 7) * 30, g - 10, 1, x, g - 10, 60);
+    flash.addColorStop(0, 'rgba(200, 250, 255, 0.55)');
+    flash.addColorStop(1, 'rgba(0, 240, 255, 0)');
+    ctx.fillStyle = flash;
+    ctx.fillRect(x - 68, g - 68, 136, 68);
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(x + Math.sin(time * 7) * 30, g - 8, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Spinning rotary exhaust fan on the left wall
+  ctx.save();
+  ctx.translate(x - 90, g - 48);
+  const fanRing = new Path2D();
+  fanRing.arc(0, 0, 10, 0, Math.PI * 2);
+  ctx.fillStyle = '#05030e';
+  ctx.fill(fanRing);
+  neonStroke(ctx, fanRing, accent, 1.2);
+  ctx.rotate(time * 5.5);
+  const blades = new Path2D();
+  blades.moveTo(-8, 0);
+  blades.lineTo(8, 0);
+  blades.moveTo(0, -8);
+  blades.lineTo(0, 8);
+  neonStroke(ctx, blades, t.sign, 1.4);
+  ctx.restore();
+
   neonSign(ctx, 'HANGAR', x, g - 96, accent, 13, time);
 }
 
@@ -458,4 +603,51 @@ function drawSkyDrone(ctx: CanvasRenderingContext2D, x: number, y: number, color
   ctx.lineTo(x - 12, y + 40);
   ctx.closePath();
   ctx.fill();
+}
+
+/** A neon-outlined yard worker in a hard hat; swaps the pickaxe for a wave at the pod. */
+function drawWorker(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  g: number,
+  dir: number,
+  walk: number,
+  color: string,
+  waving: boolean
+): void {
+  const step = waving ? 0 : Math.sin(walk);
+  const bob = Math.abs(step) * 1.5;
+  ctx.save();
+  ctx.translate(x, g - bob);
+  ctx.scale(dir, 1);
+  const body = new Path2D();
+  // Legs
+  body.moveTo(0, -14);
+  body.lineTo(-3 + step * 3, 0);
+  body.moveTo(0, -14);
+  body.lineTo(3 - step * 3, 0);
+  // Torso
+  body.moveTo(0, -14);
+  body.lineTo(0, -26);
+  // Head
+  body.moveTo(4, -30);
+  body.arc(0, -30, 4, 0, Math.PI * 2);
+  if (waving) {
+    const a = -1.1 + Math.sin(walk * 2.2) * 0.45;
+    body.moveTo(0, -23);
+    body.lineTo(Math.cos(a) * 11, -23 + Math.sin(a) * 11);
+  } else {
+    // Pickaxe over the shoulder
+    body.moveTo(-3, -18);
+    body.lineTo(6, -33);
+    body.moveTo(1, -36);
+    body.quadraticCurveTo(7, -35, 10, -30);
+  }
+  neonStroke(ctx, body, color, 1.3);
+  // Hard hat
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.arc(0, -32, 4.6, Math.PI, 0);
+  ctx.fill();
+  ctx.restore();
 }

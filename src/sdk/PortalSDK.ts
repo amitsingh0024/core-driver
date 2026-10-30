@@ -1,3 +1,4 @@
+import type { DiveContract } from '../game/DiveContract';
 const SAVE_KEY = 'core_diver_save_v1';
 
 export interface GameSettings {
@@ -23,6 +24,8 @@ export interface SaveState {
   totalDives: number;
   /** Interface unlocks the player has already opened, so their NEW badge stops showing. */
   seenUnlocks: string[];
+  /** The active work order; it carries progress across dives. */
+  workOrder?: DiveContract | null;
   settings: GameSettings;
 }
 
@@ -74,6 +77,7 @@ export class PortalSDK {
         totalDives: parsed.totalDives ?? 0,
         // Saves from before progressive unlocks already know every tab, so skip their NEW badges
         seenUnlocks: Array.isArray(parsed.seenUnlocks) ? parsed.seenUnlocks : ['planetMap', 'codex', 'garage'],
+        workOrder: parsed.workOrder ?? null,
         settings: { ...def.settings, ...(parsed.settings ?? {}) },
       };
     } catch {

@@ -65,7 +65,7 @@ export function nextLevelChanges(node: SkillNodeConfig, owned: Record<string, nu
 export function cheapestAvailableCost(save: SaveState): number {
   let best = Infinity;
   for (const node of SKILL_NODES) {
-    const ev = evaluateSkillNode(node, save.ownedSkills, save.highestUnlockedPlanet, save.cash);
+    const ev = evaluateSkillNode(node, save.ownedSkills, save.highestUnlockedPlanet, save.cash, save.deepestByPlanet);
     if (ev.state === 'AVAILABLE') best = Math.min(best, ev.nextCost);
   }
   return best;
