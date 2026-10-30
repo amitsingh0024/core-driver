@@ -26,6 +26,7 @@ export interface PodLayerState {
   isMoving: boolean;
   isDrilling: boolean;
   extractProgress: number;
+  steeringDir?: number;     // -1 left, 0 straight, 1 right: fires the opposite side thruster
 }
 
 export class SpriteAtlas {
@@ -37,6 +38,7 @@ export class SpriteAtlas {
   public fuelCellTile!: HTMLCanvasElement;
   public beaconTile!: HTMLCanvasElement;
   public relicChestTile!: HTMLCanvasElement;
+  public droneSprites: Map<number, HTMLCanvasElement> = new Map();
   public skillIcons: Map<SkillIconType, HTMLCanvasElement> = new Map();
   /** Resolves once the PNG atlases are sliced, or once the procedural fallback is in use. */
   public readonly ready: Promise<void>;
@@ -297,6 +299,57 @@ export class SpriteAtlas {
       cctx.fillStyle = pid === 1 ? '#ff5722' : pid === 2 ? '#00e5ff' : '#d500f9';
       cctx.fillRect(0, 0, HD_SIZE, HD_SIZE);
       this.coreTiles.set(pid, cc);
+    }
+
+    this.generateDroneSprites();
+  }
+
+  /** Mining drones per tier (1..3): outlined hull, rotor arms and a lens tinted to match the pod's thruster colour. */
+  private generateDroneSprites(): void {
+    const lensColors = ['#ff9100', '#00e5ff', '#ff4081'];
+    for (let tier = 1; tier <= 3; tier++) {
+      const [c, ctx] = this.createHDCanvas(64, 64);
+      ctx.translate(32, 32);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#140c1c';
+
+      // Rotor arms and pads
+      ctx.fillStyle = '#546e7a';
+      for (const dir of [-1, 1]) {
+        ctx.fillRect(dir > 0 ? 8 : -24, -3, 16, 6);
+        ctx.strokeRect(dir > 0 ? 8 : -24, -3, 16, 6);
+        ctx.beginPath();
+        ctx.ellipse(dir * 22, -6, 9, 3, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(207, 216, 220, 0.75)';
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#546e7a';
+      }
+
+      // Hull: safety yellow, heavier plating per tier
+      ctx.fillStyle = tier === 3 ? '#ffb300' : '#ffd54f';
+      ctx.beginPath();
+      ctx.arc(0, 0, 12 + tier, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      if (tier >= 2) {
+        ctx.fillStyle = '#37474f';
+        ctx.fillRect(-10 - tier, 4, 20 + tier * 2, 4);
+      }
+
+      // Lens
+      ctx.fillStyle = lensColors[tier - 1];
+      ctx.beginPath();
+      ctx.arc(0, -1, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(-1.8, -3, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      this.droneSprites.set(tier, c);
     }
   }
 
@@ -609,6 +662,23 @@ export class SpriteAtlas {
       ctx.beginPath();
       ctx.moveTo(-11, -28);
       ctx.quadraticCurveTo(0, -30 - flameLen * 1.25, 11, -28);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Side thruster puff opposite the steering direction
+    const steer = state.steeringDir ?? 0;
+    if (steer !== 0 && (state.isMoving || state.isDrilling)) {
+      const puffLen = 9 + Math.sin(state.animTime * 60) * 3;
+      const sx = -steer * 30;
+      const puff = ctx.createLinearGradient(sx, 0, sx - steer * puffLen, 0);
+      puff.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+      puff.addColorStop(1, 'rgba(0, 229, 255, 0)');
+      ctx.fillStyle = puff;
+      ctx.beginPath();
+      ctx.moveTo(sx, -6);
+      ctx.lineTo(sx - steer * puffLen, 0);
+      ctx.lineTo(sx, 6);
       ctx.closePath();
       ctx.fill();
     }

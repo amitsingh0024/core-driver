@@ -2351,3 +2351,17 @@ body.reduced-motion .low-fuel-vignette.critical {
     left: 40%;
   }
 }
+
+/* Planet Map 128x128 HD Planet Globe Preview */
+.planet-orb-preview {
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+}
+
+/* Telemetry & Inspector SVG Icon Alignment */
+.telemetry-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}

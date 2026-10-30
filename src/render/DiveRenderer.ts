@@ -287,10 +287,14 @@ export class DiveRenderer {
           ctx.fillRect(sx, sy, T, T);
           ctx.globalAlpha = 1.0;
         } else if (b.type === 'relic') {
-          drawRelicCache(ctx, sx, sy, pod.animTime + gx * 0.7);
+          drawRelicCache(ctx, this.game.atlas.relicChestTile, sx, sy, pod.animTime + gx * 0.7);
         } else if (b.oreId) {
           const oreCanvas = this.game.atlas.oreOverlays.get(b.oreId);
-          if (oreCanvas) drawEmbedded(ctx, oreCanvas, sx, sy, hash, b.armored ? 0.8 : 0.74);
+          if (oreCanvas) {
+            drawOreGlowUnderlay(ctx, b.oreId, sx, sy, hash, pod.animTime);
+            drawEmbedded(ctx, oreCanvas, sx, sy, hash, b.armored ? 0.8 : 0.74);
+            drawOreSparkleOverlay(ctx, b.oreId, sx, sy, hash, pod.animTime);
+          }
         }
 
         if (b.armored) drawArmorPlating(ctx, sx, sy);
@@ -384,29 +388,53 @@ export class DiveRenderer {
       ctx.restore();
     }
 
-    // 5. Draw Autonomous Orbiting Mining Drones & Laser Beams
+    // 5. Draw Autonomous Orbiting Mining Drones & Laser Beams (Page 5)
     for (const beam of pod.droneBeams) {
+      const fx = beam.fromX - camX;
+      const fy = beam.fromY - camY;
+      const tx = beam.toX - camX;
+      const ty = beam.toY - camY;
+      ctx.save();
       ctx.strokeStyle = beam.color;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(beam.fromX - camX, beam.fromY - camY);
-      ctx.lineTo(beam.toX - camX, beam.toY - camY);
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(tx, ty);
       ctx.stroke();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Hit spark at beam end
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3.5 + Math.sin(pod.animTime * 40) * 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
+    const droneTier = Math.min(3, Math.max(1, this.game.stats.podTier + 1));
+    const droneSprite = this.game.atlas.droneSprites.get(droneTier);
     for (let d = 0; d < this.game.stats.droneCount; d++) {
       const orbitAngle = pod.animTime * 3.2 + (d * Math.PI * 2) / this.game.stats.droneCount;
-      const dx = pod.x - camX + Math.cos(orbitAngle) * 28;
-      const dy = pod.y - camY + Math.sin(orbitAngle) * 20;
+      const hoverBob = Math.sin(pod.animTime * 9 + d * 2.1) * 2.5;
+      const dx = pod.x - camX + Math.cos(orbitAngle) * 30;
+      const dy = pod.y - camY + Math.sin(orbitAngle) * 21 + hoverBob;
 
-      const droneGrad = ctx.createRadialGradient(dx - 2, dy - 2, 1, dx, dy, 7.5);
-      droneGrad.addColorStop(0, '#ffffff');
-      droneGrad.addColorStop(0.5, d === 2 ? '#ff4081' : d === 1 ? '#ea80fc' : '#00e5ff');
-      droneGrad.addColorStop(1, '#102027');
-      ctx.fillStyle = droneGrad;
-      ctx.beginPath();
-      ctx.arc(dx, dy, 7.5, 0, Math.PI * 2);
-      ctx.fill();
+      if (droneSprite) {
+        const dSize = 24;
+        ctx.drawImage(droneSprite, dx - dSize / 2, dy - dSize / 2, dSize, dSize);
+      } else {
+        const droneGrad = ctx.createRadialGradient(dx - 2, dy - 2, 1, dx, dy, 7.5);
+        droneGrad.addColorStop(0, '#ffffff');
+        droneGrad.addColorStop(0.5, d === 2 ? '#ff4081' : d === 1 ? '#ea80fc' : '#00e5ff');
+        droneGrad.addColorStop(1, '#102027');
+        ctx.fillStyle = droneGrad;
+        ctx.beginPath();
+        ctx.arc(dx, dy, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // 6. Draw Winch Tether Cable from surface when Extracting
@@ -426,6 +454,7 @@ export class DiveRenderer {
     const podScreenY = pod.y - camY;
     const isCargoFull = pod.cargoUsed >= pod.maxCargo;
     const isLowFuel = pod.fuel / pod.maxFuel <= 0.25;
+    const steeringDir = Math.abs(pod.angle) > 0.05 ? Math.sign(pod.angle) : 0;
 
     ctx.save();
     ctx.translate(podScreenX, podScreenY);
@@ -438,24 +467,25 @@ export class DiveRenderer {
         isMoving: pod.isMoving,
         isDrilling: pod.isDrilling,
         extractProgress: pod.extractProgress,
+        steeringDir,
       }),
       1.0
     );
     ctx.restore();
 
-    // 8. Consecutive Ore Combo Badge above Pod (x2, x3, x4)
+    // 8. Consecutive Ore Combo Gem Counter Badge above Pod (Page 7: x2, x3, x4)
     if (pod.comboCount > 1 && pod.comboTimer > 0 && pod.comboOreId) {
       const comboOre = ORES[pod.comboOreId];
-      ctx.save();
-      ctx.font = '700 12px "Chakra Petch", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = comboOre?.highlightColor ?? '#ffd54f';
-      ctx.fillText(
-        `COMBO ×${pod.comboCount} ${comboOre?.name.toUpperCase() ?? ''}!`,
+      const badgeY = podScreenY - (pod.isHardGrinding || pod.depthMeters <= 4 ? 68 : 58);
+      drawComboGemBadge(
+        ctx,
         podScreenX,
-        podScreenY - (pod.isHardGrinding || pod.depthMeters <= 4 ? 46 : 34)
+        badgeY,
+        pod.comboCount,
+        comboOre?.name.toUpperCase() ?? 'ORE',
+        comboOre?.color ?? '#ffd54f',
+        comboOre?.highlightColor ?? '#fff8e1'
       );
-      ctx.restore();
     }
 
     // Prompt when stationary at surface (0m) so player knows they control when to drill
@@ -477,17 +507,27 @@ export class DiveRenderer {
       ctx.fillText('DENSE ROCK — UPGRADE DRILL IN DEEP GRID!', podScreenX, podScreenY - 28);
     }
 
-    // 9. Touch / Mouse Steering Drag Ring Indicator
+    // 9. Touch / Mouse Virtual Stick & Steering Drag Ring Indicator (Page 12)
     if (pointer.down) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.55)';
+      // Outer virtual stick ring around pointer
+      ctx.fillStyle = 'rgba(7, 10, 18, 0.35)';
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.65)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(pointer.x, pointer.y, 22, 0, Math.PI * 2);
+      ctx.arc(pointer.x, pointer.y, 26, 0, Math.PI * 2);
+      ctx.fill();
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.25)';
-      ctx.setLineDash([4, 4]);
+      // Inner thumb puck
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.8)';
+      ctx.beginPath();
+      ctx.arc(pointer.x, pointer.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dashed vector line from pod to steering target
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.32)';
+      ctx.setLineDash([5, 4]);
       ctx.beginPath();
       ctx.moveTo(podScreenX, podScreenY);
       ctx.lineTo(pointer.x, pointer.y);
@@ -503,34 +543,200 @@ export class DiveRenderer {
   }
 }
 
-/** Placeholder relic chest until the artist delivers `relic_chest` sprites: a gold-trimmed crate with a pulsing glow. */
-function drawRelicCache(ctx: CanvasRenderingContext2D, x: number, y: number, t: number): void {
-  const pad = TILE_SIZE * 0.18;
-  const w = TILE_SIZE - pad * 2;
-  const h = w * 0.78;
-  const top = y + (TILE_SIZE - h) / 2;
+/** Renders the Ancient Relic Chest using the HD illustrated sprite + pulsing golden halo (Page 7). */
+function drawRelicCache(
+  ctx: CanvasRenderingContext2D,
+  sprite: HTMLCanvasElement | undefined,
+  x: number,
+  y: number,
+  t: number
+): void {
   const glow = 0.35 + Math.sin(t * 4) * 0.2;
+  const cx = x + TILE_SIZE / 2;
+  const cy = y + TILE_SIZE / 2;
 
   ctx.save();
-  ctx.shadowColor = '#ffd54f';
-  ctx.shadowBlur = 10 * glow + 4;
-  ctx.fillStyle = '#5d3a1a';
-  ctx.fillRect(x + pad, top, w, h);
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = '#7b4f24';
-  ctx.fillRect(x + pad, top, w, h * 0.38);
-  ctx.strokeStyle = '#ffd54f';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x + pad + 1, top + 1, w - 2, h - 2);
+  const halo = ctx.createRadialGradient(cx, cy, 4, cx, cy, TILE_SIZE * 0.52);
+  halo.addColorStop(0, `rgba(255, 213, 79, ${(0.45 * glow).toFixed(2)})`);
+  halo.addColorStop(1, 'rgba(255, 213, 79, 0)');
+  ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.moveTo(x + pad, top + h * 0.38);
-  ctx.lineTo(x + pad + w, top + h * 0.38);
+  ctx.arc(cx, cy, TILE_SIZE * 0.52, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (sprite) {
+    const sz = TILE_SIZE * 0.86;
+    ctx.drawImage(sprite, cx - sz / 2, cy - sz / 2, sz, sz);
+  } else {
+    const pad = TILE_SIZE * 0.18;
+    const w = TILE_SIZE - pad * 2;
+    const h = w * 0.78;
+    const top = y + (TILE_SIZE - h) / 2;
+    ctx.fillStyle = '#5d3a1a';
+    ctx.fillRect(x + pad, top, w, h);
+    ctx.strokeStyle = '#ffd54f';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + pad + 1, top + 1, w - 2, h - 2);
+  }
+  ctx.restore();
+}
+
+/**
+ * Ore Glow Tiers (Page 7):
+ * - Common (tier 1: coal, copper, iron): static, no glow
+ * - Uncommon (tier 2: silver, gold, cobalt, aquamarine): diagonal glint sweep every 2s
+ * - Rare (tier 3: platinum, titanium, cryo_diamond, uranium): pulsing glow (0.5 -> 1.0, 1.5s) + 1–2 sparkles
+ * - Epic/Mythic (tier 4+: ruby, mythril, painite, voidstone): soft light halo + 3–4 sparkles
+ */
+function getOreGlowTier(oreId: string): 1 | 2 | 3 | 4 {
+  switch (oreId) {
+    case 'coal':
+    case 'copper':
+    case 'iron':
+      return 1;
+    case 'silver':
+    case 'gold':
+    case 'cobalt':
+    case 'aquamarine':
+      return 2;
+    case 'platinum':
+    case 'titanium':
+    case 'cryo_diamond':
+    case 'uranium':
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+function drawOreGlowUnderlay(
+  ctx: CanvasRenderingContext2D,
+  oreId: string,
+  sx: number,
+  sy: number,
+  hash: number,
+  animTime: number
+): void {
+  const tier = getOreGlowTier(oreId);
+  if (tier < 3) return;
+  const ore = ORES[oreId];
+  if (!ore) return;
+
+  const cx = sx + TILE_SIZE / 2;
+  const cy = sy + TILE_SIZE / 2;
+  const cycle = Math.sin((animTime * Math.PI * 2) / 1.5 + (hash % 17)) * 0.25 + 0.75; // 0.5 -> 1.0
+  const radius = tier === 4 ? TILE_SIZE * 0.54 : TILE_SIZE * 0.42;
+
+  ctx.save();
+  ctx.globalAlpha = (tier === 4 ? 0.42 : 0.26) * cycle;
+  const g = ctx.createRadialGradient(cx, cy, 3, cx, cy, radius);
+  g.addColorStop(0, ore.highlightColor);
+  g.addColorStop(0.55, ore.color);
+  g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawOreSparkleOverlay(
+  ctx: CanvasRenderingContext2D,
+  oreId: string,
+  sx: number,
+  sy: number,
+  hash: number,
+  animTime: number
+): void {
+  const tier = getOreGlowTier(oreId);
+  if (tier === 1) return;
+  const ore = ORES[oreId];
+  if (!ore) return;
+
+  const cx = sx + TILE_SIZE / 2;
+  const cy = sy + TILE_SIZE / 2;
+
+  ctx.save();
+  if (tier === 2) {
+    // Uncommon: diagonal glint line sweeps across the gem every 2s
+    const phase = ((animTime + (hash % 23) * 0.13) % 2.0) / 2.0;
+    if (phase < 0.32) {
+      const t = phase / 0.32;
+      const gx = cx - 10 + t * 20;
+      const gy = cy - 10 + t * 20;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(gx - 5, gy + 5);
+      ctx.lineTo(gx + 5, gy - 5);
+      ctx.stroke();
+    }
+  } else {
+    // Rare (2 sparkles) or Epic/Mythic (4 sparkles)
+    const count = tier === 4 ? 4 : 2;
+    for (let i = 0; i < count; i++) {
+      const angle = ((hash >> (i * 3)) % 12) * 0.52 + i * 1.57;
+      const dist = 8 + ((hash >> (i * 2)) % 6);
+      const blink = Math.max(0, Math.sin(animTime * 4.5 + i * 1.9 + (hash % 11)));
+      if (blink < 0.2) continue;
+      const px = cx + Math.cos(angle) * dist;
+      const py = cy + Math.sin(angle) * dist - ((animTime * 4 + i * 3) % 4);
+      const r = (tier === 4 ? 2.4 : 1.8) * blink;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/** Styled Combo Gem Badge over the pod showing x2, x3, x4 (Page 7). */
+function drawComboGemBadge(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  comboCount: number,
+  oreName: string,
+  color: string,
+  highlight: string
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+
+  const label = `×${comboCount} ${oreName}`;
+  ctx.font = '800 11px "Chakra Petch", sans-serif';
+  const tw = ctx.measureText(label).width;
+  const pillW = tw + 34;
+  const pillH = 22;
+
+  // Pill backing
+  ctx.fillStyle = 'rgba(10, 14, 24, 0.9)';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.roundRect(-pillW / 2, -pillH / 2, pillW, pillH, 11);
+  ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = '#ffd54f';
-  ctx.fillRect(x + TILE_SIZE / 2 - 3, top + h * 0.3, 6, 8);
-  ctx.globalAlpha = glow;
-  ctx.fillStyle = '#fff8e1';
-  ctx.fillRect(x + TILE_SIZE / 2 - 1.5, top + h * 0.3 + 2, 3, 3);
+
+  // Faceted mini gem icon on left of badge
+  const gx = -pillW / 2 + 13;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = highlight;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(gx, -6);
+  ctx.lineTo(gx + 6, 0);
+  ctx.lineTo(gx, 6);
+  ctx.lineTo(gx - 6, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = highlight;
+  ctx.textAlign = 'left';
+  ctx.fillText(label, gx + 10, 4);
   ctx.restore();
 }
 
