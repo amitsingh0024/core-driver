@@ -1,5 +1,6 @@
 import { PlanetConfig, StratumConfig } from '../config/planets';
 import { ORES } from '../config/ores';
+import { VEIN_TUNING } from '../config/veins';
 
 export const TILE_SIZE = 44;
 export const WORLD_COLS = 45;
@@ -45,37 +46,13 @@ export class DiveWorld {
   public totalCoreMaxHp = 0;
   public currentCoreHp = 0;
   private seed: number;
-  private pocketSeed: number;
 
   constructor(planet: PlanetConfig, seed = Date.now()) {
     this.planet = planet;
     this.seed = seed;
-    this.pocketSeed = seed % 100003;
     this.totalRows = Math.ceil(planet.maxDepth / METERS_PER_ROW) + 6;
     this.coreStartRow = Math.floor(planet.maxDepth / METERS_PER_ROW) - 2;
     this.generateWorld();
-  }
-
-  /** Smooth value noise (cells of 4 tiles), squared and scaled so its mean is 1. */
-  private orePocket(gx: number, gy: number): number {
-    const cell = 4;
-    const fx = gx / cell;
-    const fy = gy / cell;
-    const x0 = Math.floor(fx);
-    const y0 = Math.floor(fy);
-    const tx = fx - x0;
-    const ty = fy - y0;
-    const sx = tx * tx * (3 - 2 * tx);
-    const sy = ty * ty * (3 - 2 * ty);
-    const v = (x: number, y: number) => {
-      let h = Math.imul(x * 374761393 + y * 668265263 + this.pocketSeed, 1274126177);
-      h ^= h >>> 15;
-      return ((h >>> 0) % 10000) / 10000;
-    };
-    const top = v(x0, y0) + (v(x0 + 1, y0) - v(x0, y0)) * sx;
-    const bottom = v(x0, y0 + 1) + (v(x0 + 1, y0 + 1) - v(x0, y0 + 1)) * sx;
-    const n = top + (bottom - top) * sy;
-    return 2.6 * n * n + 0.13;
   }
 
   private rand(): number {
@@ -94,18 +71,6 @@ export class DiveWorld {
     return { stratum: this.planet.strata[lastIdx], index: lastIdx };
   }
 
-  private pickWeightedOre(weights: Record<string, number>): string | null {
-    let total = 0;
-    for (const w of Object.values(weights)) total += w;
-    if (total <= 0) return null;
-    let r = this.rand() * total;
-    for (const [oreId, w] of Object.entries(weights)) {
-      r -= w;
-      if (r <= 0) return oreId;
-    }
-    return Object.keys(weights)[0] ?? null;
-  }
-
   private generateWorld(): void {
     this.grid = [];
     this.totalCoreMaxHp = 0;
@@ -118,9 +83,7 @@ export class DiveWorld {
       const depthMeters = gy * METERS_PER_ROW;
       const { stratum, index: stratumIdx } = this.getStratumForDepth(depthMeters);
 
-      const stratumSpan = Math.max(1, stratum.endDepth - stratum.startDepth);
-      const localProgress = Math.max(0, Math.min(1, (depthMeters - stratum.startDepth) / stratumSpan));
-      const depthHpScale = 1 + localProgress * 0.45;
+      const depthHpScale = 1 + this.stratumProgress(depthMeters, stratum) * 0.45;
 
       for (let gx = 0; gx < WORLD_COLS; gx++) {
         if (gx === 0 || gx === WORLD_COLS - 1) {
@@ -248,44 +211,14 @@ export class DiveWorld {
           continue;
         }
 
-        // Armored Veins (~4% of rock from stratum 2 down): 3x HP, guaranteed rarest ore
-        if (stratumIdx >= 1 && gy < this.coreStartRow - 2 && r >= 0.062 && r < 0.102) {
-          const oreId = rarestOre(stratum);
-          const armorHp = Math.round((stratum.baseHp * depthHpScale + (oreId ? ORES[oreId].extraHp : 0)) * 3);
-          row.push({
-            gx,
-            gy,
-            type: 'rock',
-            stratumIdx,
-            stratumId: stratum.id,
-            oreId,
-            hp: armorHp,
-            maxHp: armorHp,
-            armored: true,
-          });
-          continue;
-        }
-
-        let oreId: string | null = null;
-        // Ore clusters into pockets: a smooth field with mean 1 scales the stratum's density
-        if (this.rand() < stratum.oreDensity * this.orePocket(gx, gy)) {
-          oreId = this.pickWeightedOre(stratum.oreWeights);
-        }
-
-        if (gy >= 1 && gy <= 4 && Math.abs(gx - centerCol) <= 3 && this.rand() < 0.45) {
-          oreId = this.pickWeightedOre(stratum.oreWeights);
-        }
-
-        const oreCfg = oreId ? ORES[oreId] : null;
-        const blockHp = Math.round(stratum.baseHp * depthHpScale + (oreCfg ? oreCfg.extraHp : 0));
-
+        const blockHp = Math.round(stratum.baseHp * depthHpScale);
         row.push({
           gx,
           gy,
           type: 'rock',
           stratumIdx,
           stratumId: stratum.id,
-          oreId,
+          oreId: null,
           hp: blockHp,
           maxHp: blockHp,
         });
@@ -294,23 +227,184 @@ export class DiveWorld {
       this.grid.push(row);
     }
 
-    for (let gy = 2; gy < this.coreStartRow - 2; gy++) {
-      for (let gx = 2; gx < WORLD_COLS - 2; gx++) {
-        const b = this.grid[gy][gx];
-        if (b.type === 'rock' && b.oreId && !b.armored && this.rand() < 0.25) {
-          const nx = gx + (this.rand() < 0.5 ? -1 : 1);
-          const nb = this.grid[gy][nx];
-          if (nb && nb.type === 'rock' && !nb.oreId && !nb.armored) {
-            nb.oreId = b.oreId;
-            const oreCfg = ORES[b.oreId];
-            if (oreCfg) {
-              nb.hp += oreCfg.extraHp;
-              nb.maxHp = nb.hp;
-            }
-          }
+    this.placeVeins();
+  }
+
+  /** 0 at the top of a stratum, 1 at its bottom. */
+  private stratumProgress(depthMeters: number, stratum: StratumConfig): number {
+    const span = Math.max(1, stratum.endDepth - stratum.startDepth);
+    return Math.max(0, Math.min(1, (depthMeters - stratum.startDepth) / span));
+  }
+
+  private randRange([min, max]: [number, number]): number {
+    return min + Math.floor(this.rand() * (max - min + 1));
+  }
+
+  /** Can this tile take ore? Plain rock inside the vein's stratum, clear of the core cap. */
+  private canHoldOre(gx: number, gy: number, stratumIdx: number): boolean {
+    if (gx < 1 || gx > WORLD_COLS - 2 || gy < 1 || gy >= this.coreStartRow - 2) return false;
+    const b = this.grid[gy][gx];
+    return b.type === 'rock' && !b.oreId && b.stratumIdx === stratumIdx;
+  }
+
+  private setOre(b: WorldBlock, oreId: string, armored = false): void {
+    const { stratum } = this.getStratumForDepth(b.gy * METERS_PER_ROW);
+    const base = stratum.baseHp * (1 + this.stratumProgress(b.gy * METERS_PER_ROW, stratum) * 0.45);
+    const hp = Math.round((base + (ORES[oreId]?.extraHp ?? 0)) * (armored ? 3 : 1));
+    b.oreId = oreId;
+    b.hp = hp;
+    b.maxHp = hp;
+    if (armored) b.armored = true;
+  }
+
+  /**
+   * Grows one vein from (gx, gy) with a wandering walk that drifts mostly
+   * sideways, like a seam following the strata. Returns the tiles it filled.
+   */
+  private growVein(gx: number, gy: number, stratumIdx: number, oreId: string, size: number, armored = false): WorldBlock[] {
+    const placed: WorldBlock[] = [];
+    const place = (x: number, y: number) => {
+      if (placed.length >= size || !this.canHoldOre(x, y, stratumIdx)) return;
+      const b = this.grid[y][x];
+      this.setOre(b, oreId, armored);
+      placed.push(b);
+    };
+
+    let x = gx;
+    let y = gy;
+    let angle = (this.rand() - 0.5) * 1.2 + (this.rand() < 0.5 ? 0 : Math.PI);
+    // Compact lodes (armored, rare) curl tighter than long common seams.
+    const wander = VEIN_TUNING.wander * (size <= 5 ? 1.8 : 1);
+    let px = Math.round(x);
+    let py = Math.round(y);
+    for (let step = 0; step < size * 4 && placed.length < size; step++) {
+      const tx = Math.round(x);
+      const ty = Math.round(y);
+      // Fill the corner on diagonal steps so the vein stays edge-connected.
+      if (tx !== px && ty !== py) place(tx, py);
+      place(tx, ty);
+      px = tx;
+      py = ty;
+      if (this.rand() < VEIN_TUNING.thickness) place(tx, ty + (this.rand() < 0.5 ? -1 : 1));
+      angle += (this.rand() - 0.5) * 2 * wander;
+      let nx = x + Math.cos(angle);
+      let ny = y + Math.sin(angle) * 0.75;
+      // Bounce off the side walls and the stratum's edges instead of leaking out.
+      if (nx < 1 || nx > WORLD_COLS - 2) {
+        angle = Math.PI - angle;
+        nx = x + Math.cos(angle);
+      }
+      const nb = this.grid[Math.round(ny)]?.[Math.round(nx)];
+      if (!nb || nb.stratumIdx !== stratumIdx || Math.round(ny) < 1 || Math.round(ny) >= this.coreStartRow - 2) {
+        angle = -angle;
+        ny = y + Math.sin(angle) * 0.75;
+      }
+      x = Math.max(1, Math.min(WORLD_COLS - 2, nx));
+      y = ny;
+    }
+    return placed;
+  }
+
+  /** Rings a vein with a sparse halo of the next-lower ore, so rich veins sit inside poorer rock. */
+  private haloVein(vein: WorldBlock[], stratumIdx: number, haloOre: string): number {
+    let count = 0;
+    for (const b of vein) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (this.canHoldOre(b.gx + dx, b.gy + dy, stratumIdx) && this.rand() < VEIN_TUNING.haloChance) {
+          this.setOre(this.grid[b.gy + dy][b.gx + dx], haloOre);
+          count++;
         }
       }
     }
+    return count;
+  }
+
+  /** Picks a start row inside the stratum, skewed deeper for higher-tier ores (rank 0..1). */
+  private veinRow(rows: number[], rank: number): number {
+    const skew = VEIN_TUNING.depthBanding * (rank * 2 - 1);
+    const u = this.rand();
+    const p = skew >= 0 ? Math.pow(u, 1 / (1 + skew)) : 1 - Math.pow(u, 1 / (1 - skew));
+    return rows[Math.min(rows.length - 1, Math.floor(p * rows.length))];
+  }
+
+  /**
+   * Places ore as veins. Each stratum gets a tile budget per ore (rock tiles x
+   * oreDensity x weight share), then veins are grown until the budgets are spent,
+   * so the overall ore economy stays tied to the strata config.
+   */
+  private placeVeins(): void {
+    const centerCol = Math.floor(WORLD_COLS / 2);
+
+    this.planet.strata.forEach((stratum, stratumIdx) => {
+      const rows: number[] = [];
+      let rockTiles = 0;
+      for (let gy = 1; gy < this.coreStartRow - 2; gy++) {
+        if (this.grid[gy][1].stratumIdx !== stratumIdx) continue;
+        rows.push(gy);
+        for (let gx = 1; gx < WORLD_COLS - 1; gx++) if (this.grid[gy][gx].type === 'rock') rockTiles++;
+      }
+      if (rows.length === 0) return;
+
+      // Ores ordered common -> rare by tier; rank 0..1 drives vein size, depth band and halo.
+      const ores = Object.keys(stratum.oreWeights).sort((a, b) => (ORES[a]?.tier ?? 0) - (ORES[b]?.tier ?? 0));
+      const rankOf = (oreId: string) => (ores.length > 1 ? ores.indexOf(oreId) / (ores.length - 1) : 0);
+      let weightTotal = 0;
+      for (const id of ores) weightTotal += stratum.oreWeights[id];
+      const oreTiles = rockTiles * stratum.oreDensity * VEIN_TUNING.densityScale;
+      const budget: Record<string, number> = {};
+      for (const id of ores) budget[id] = (oreTiles * stratum.oreWeights[id]) / weightTotal;
+
+      // Armored lodes: compact riveted clusters of the rarest ore, from stratum 2 down.
+      const rarest = rarestOre(stratum);
+      if (stratumIdx >= 1 && rarest) {
+        let armoredBudget = rockTiles * VEIN_TUNING.armoredShare;
+        for (let tries = 0; armoredBudget > 0 && tries < 400; tries++) {
+          const gy = this.veinRow(rows, 1);
+          const gx = 1 + Math.floor(this.rand() * (WORLD_COLS - 2));
+          const size = Math.min(Math.ceil(armoredBudget), this.randRange(VEIN_TUNING.armoredLodeSize));
+          armoredBudget -= this.growVein(gx, gy, stratumIdx, rarest, size, true).length;
+        }
+      }
+
+      // A guaranteed seam of the commonest ore right under the launch shaft.
+      if (stratumIdx === 0 && ores.length > 0) {
+        const seam = this.growVein(centerCol, 2 + Math.floor(this.rand() * 2), 0, ores[0], VEIN_TUNING.starterSeamSize);
+        budget[ores[0]] -= seam.length;
+      }
+
+      for (let tries = 0; tries < 2000; tries++) {
+        // Pick the next vein's ore in proportion to what's left of each budget.
+        let remaining = 0;
+        for (const id of ores) remaining += Math.max(0, budget[id]);
+        if (remaining < 1) break;
+        let r = this.rand() * remaining;
+        let oreId = ores[ores.length - 1];
+        for (const id of ores) {
+          r -= Math.max(0, budget[id]);
+          if (r <= 0) {
+            oreId = id;
+            break;
+          }
+        }
+
+        const rank = rankOf(oreId);
+        const [cMin, cMax] = VEIN_TUNING.commonVeinSize;
+        const [rMin, rMax] = VEIN_TUNING.rareVeinSize;
+        const size = Math.max(1, Math.min(
+          Math.ceil(budget[oreId]),
+          this.randRange([Math.round(cMin + (rMin - cMin) * rank), Math.round(cMax + (rMax - cMax) * rank)]),
+        ));
+        const gy = this.veinRow(rows, rank);
+        const gx = 1 + Math.floor(this.rand() * (WORLD_COLS - 2));
+        const vein = this.growVein(gx, gy, stratumIdx, oreId, size);
+        budget[oreId] -= vein.length;
+
+        const idx = ores.indexOf(oreId);
+        if (idx > 0 && budget[ores[idx - 1]] > 0) {
+          budget[ores[idx - 1]] -= this.haloVein(vein, stratumIdx, ores[idx - 1]);
+        }
+      }
+    });
   }
 
   public getBlock(gx: number, gy: number): WorldBlock | null {

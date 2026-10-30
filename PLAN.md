@@ -39,7 +39,7 @@ Goal: every dive should feel chunky, have a target, and hold one surprise. Based
 - **Combo pays out:** the same-ore combo (x2 to x4) now adds +15% per step as real credits, shown as its own line on the Results screen. Combo credits are part of the cargo and are halved on a fuel-out tow like ore.
 - **Dive Contracts:** each dive rolls one goal shown under the fuel bar: reach a depth, mine N of an ore, or bring back a haul worth $X. Targets scale from your best depth on the planet. Completing it pays a bonus on the Results screen, even on a tow.
 - **Relic Caches:** rare buried chests (about 1 in 500 tiles below 60 m). Cracking one banks a credit bounty immediately (safe from fuel-out loss), worth roughly 4 to 7 of the best ore in that stratum.
-- **Armored Veins:** from stratum 2 down, about 4% of rock is riveted armor with 3x HP that always holds the rarest ore of that stratum. A slow, fuel-costly grind with a guaranteed payoff.
+- **Armored Veins:** from stratum 2 down, about 4% of rock is riveted armor with 3x HP that always holds the rarest ore of that stratum, placed as compact 3 to 5 tile lodes. A slow, fuel-costly grind with a guaranteed payoff.
 - **Extraction Beacons charge instead of ending the dive:** drilling a beacon stores an instant-extract charge (the Extract button glows); the next Extract press surfaces immediately with no winch wait. Before, drilling one by accident ended the dive.
 - **Settings that work:** SFX volume is a real master gain; Colorblind mode draws state glyphs on Deep Grid nodes; Haptics vibrates on ore, relic and core breaks.
 
@@ -91,3 +91,11 @@ The painted "company issue" look is replaced by a synthwave neon style, all draw
 - **UI:** `neon.css` loads after `theme.css`, re-points its tokens at the neon palette and swaps rivets, hazard stripes and paper slips for glass panels with glowing edges. Fonts are Orbitron (display), Rajdhani (body) and Share Tech Mono (readouts).
 - **Audio:** `MusicDirector` is now a 16-step synthwave sequencer. Each planet has a tempo, a four-chord loop, an arp pattern and an arp waveform. The layers are detuned saw pads, an eighth-note bass, a sixteenth arp through a dotted-eighth echo, and kick, snare and hats. Dives drop the snare and halve the arp, and the low-pass still closes with depth. Ore pickups are quick square-wave arpeggios.
 - **Hangar:** Deep Grid nodes have glowing borders, skill icons get a neon glow, and planet orbs are wireframe globes in each planet's neon colours.
+
+## 8. Ore Veins (Oct 2026)
+Ore used to be a per-tile dice roll, which read as noise. It is now grown as veins (`DiveWorld.placeVeins`, tuned in `config/veins.ts`):
+- **Budgeted:** each stratum gets an ore tile budget of rock tiles x `oreDensity` x weight share, and veins grow until it's spent, so ore share per stratum and per ore stays where the balance pass put it (within ~1 point).
+- **Shape:** a wandering walk that drifts sideways like a seam, with ragged thickness. Common ores make long seams (8 to 16 tiles), rare ores short pockets (3 to 7). Rich veins carry a sparse halo of the next-lower ore.
+- **Depth bands:** inside a stratum, common ores lean toward the top and rare ores toward the bottom.
+- **Starter seam:** a guaranteed seam of the first ore crosses the launch shaft.
+- `npm run ore-report` prints ore share, cluster size and per-ore counts per stratum; `npm run ore-report -- --map 1 42` prints an ASCII map.
