@@ -21,7 +21,7 @@ export class ResultsScreen {
       outcomeTitle.textContent = `${planet.coreName.toUpperCase()} SHATTERED!`;
       outcomeTitle.dataset.outcome = 'core';
     } else if (reason === 'fuel_out') {
-      outcomeTitle.textContent = 'FUEL DEPLETED — EMERGENCY TOW';
+      outcomeTitle.textContent = 'TETHER SNAPPED — HALF THE HOLD LOST';
       outcomeTitle.dataset.outcome = 'tow';
     } else {
       outcomeTitle.textContent = 'SAFE RETURN';
