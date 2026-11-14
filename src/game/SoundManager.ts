@@ -298,6 +298,62 @@ export class SoundManager {
     });
   }
 
+  /**
+   * The planet's heart: a low lub-dub. Intensity 0..1 grows as the pod nears the core.
+   */
+  public playHeartbeat(intensity: number): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const level = 0.05 + 0.3 * Math.max(0, Math.min(1, intensity));
+    [0, 0.17].forEach((offset, idx) => {
+      const t = now + offset;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(idx === 0 ? 62 : 54, t);
+      osc.frequency.exponentialRampToValueAtTime(34, t + 0.16);
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(level * (idx === 0 ? 1 : 0.7), t + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      osc.connect(gain);
+      gain.connect(this.master!);
+      osc.start(t);
+      osc.stop(t + 0.24);
+    });
+  }
+
+  /** The tether parting under load: a sharp crack, then a falling twang. */
+  public playTetherSnap(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const len = Math.floor(ctx.sampleRate * 0.12);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const crackGain = ctx.createGain();
+    crackGain.gain.value = 0.35;
+    noise.connect(crackGain);
+    crackGain.connect(this.master!);
+    noise.start(now);
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(420, now + 0.02);
+    osc.frequency.exponentialRampToValueAtTime(48, now + 0.7);
+    gain.gain.setValueAtTime(0.12, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+    osc.connect(gain);
+    gain.connect(this.master!);
+    osc.start(now + 0.02);
+    osc.stop(now + 0.78);
+  }
+
   public playCoreShatter(): void {
     const ctx = this.ensureContext();
     if (!ctx) return;

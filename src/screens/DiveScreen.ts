@@ -21,6 +21,9 @@ export class DiveScreen {
   public contractCompleted = false;
   /** Work orders stay off for a new player's first dives so the HUD only teaches the core loop. */
   public contractActive = false;
+  /** 1 on each beat of the planet's heart, decaying to 0; the renderer pulses the core glow with it. */
+  public heartPulse = 0;
+  private heartTimer = 0;
   private canvas = $<HTMLCanvasElement>('dive-canvas');
   private lowFuelVignette = $('low-fuel-vignette');
   private coarsePointer = window.matchMedia?.('(pointer: coarse)');
@@ -230,6 +233,8 @@ export class DiveScreen {
     this.fuelAlarmTimer = 0;
     this.toastTimer = 0;
     this.musicDepthTimer = 0;
+    this.heartTimer = 1.2;
+    this.heartPulse = 0;
     this.recordToastShown = false;
     this.cargoToastShown = false;
     this.startBestDepth = this.game.save.deepestByPlanet[planetId] ?? 0;
@@ -276,7 +281,28 @@ export class DiveScreen {
       this.game.sound.setMusicDepth(pod.depthMeters / this.world.planet.maxDepth);
     }
 
+    this.updateHeartbeat(dt);
     this.updateCoach(dt, fuelPct);
+  }
+
+  /**
+   * The planet is alive: its core beats, faint near the surface and faster, louder and
+   * harder-felt as the pod closes in.
+   */
+  private updateHeartbeat(dt: number): void {
+    const ratio = Math.max(0, Math.min(1, this.pod.depthMeters / this.world.planet.maxDepth));
+    this.heartPulse = Math.max(0, this.heartPulse - dt * 2.6);
+    if (ratio < 0.04) return;
+    this.heartTimer -= dt;
+    if (this.heartTimer > 0) return;
+    this.heartTimer = 1.6 - ratio * 0.95;
+    this.heartPulse = 1;
+    this.game.sound.playHeartbeat(ratio);
+    const { screenShake, reducedMotion } = this.game.save.settings;
+    if (ratio > 0.5 && screenShake && !reducedMotion) {
+      this.pod.screenShake = Math.max(this.pod.screenShake, (ratio - 0.5) * 6);
+    }
+    if (ratio > 0.75) this.game.haptic(12);
   }
 
   private setFuelAlarmVisuals(fuelPct: number): void {

@@ -99,3 +99,9 @@ Ore used to be a per-tile dice roll, which read as noise. It is now grown as vei
 - **Depth bands:** inside a stratum, common ores lean toward the top and rare ores toward the bottom.
 - **Starter seam:** a guaranteed seam of the first ore crosses the launch shaft.
 - `npm run ore-report` prints ore share, cluster size and per-ore counts per stratum; `npm run ore-report -- --map 1 42` prints an ASCII map.
+
+## 9. Identity: The Tether and the Living Core (Nov 2026)
+First slice of the new identity. The pod is always tied to the outpost by a cable, and every planet is a living thing whose core is its heart.
+- **Tether** (`DrillPod.tetherPath`, `DiveRenderer.drawTether`): a cable runs from the derrick's sheave along the tunnel the pod has dug. It shifts from amber to red as fuel drops and trembles below 30%. While winching, bright pulses travel up it.
+- **Snap replaces the tow:** on a fuel-out the cable parts near the pod with a crack and a falling twang (`SoundManager.playTetherSnap`). The upper cable whips up and fades, and the stub drops. Results reads "Tether snapped, half the hold lost". The 50% cargo rule is unchanged.
+- **Heartbeat** (`DiveScreen.updateHeartbeat`, `SoundManager.playHeartbeat`): a low lub-dub that starts past 4% of the planet's depth and gets faster and louder toward the core (every 1.6 s near the top, about 0.65 s at the core). Each beat swells a core-coloured glow up from below the screen and pulses the core tiles. Past halfway it nudges the camera (off with Screen Shake or Reduced Motion), and past 75% it buzzes on phones (off with Haptics).

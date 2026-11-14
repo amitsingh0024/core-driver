@@ -34,6 +34,9 @@ export class DiveRenderer {
   }));
 
   /** Snap the camera to the pod on the next frame (new dive). */
+  private tetherSnapTime: number | null = null;
+  private tetherSparked = false;
+
   public resetCamera(): void {
     this.camReady = false;
   }
@@ -248,6 +251,119 @@ export class DiveRenderer {
     ctx.restore();
   }
 
+  /** The core's heartbeat seen from above: a glow that swells up from below the screen on each beat. */
+  private drawHeartGlow(ctx: CanvasRenderingContext2D, w: number, h: number, depthRatio: number, color: string): void {
+    const pulse = this.dive.heartPulse;
+    const ratio = Math.max(0, Math.min(1, depthRatio));
+    const alpha = pulse * (0.08 + ratio * 0.3);
+    if (alpha < 0.01) return;
+    const grad = ctx.createRadialGradient(w / 2, h * 1.25, h * 0.2, w / 2, h * 1.25, h * (0.9 + ratio * 0.5));
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  /**
+   * The tether runs from the derrick's sheave along the pod's tunnel. It shifts from amber to
+   * red and trembles as fuel runs low, carries a pulse while winching, and snaps on a fuel-out.
+   */
+  private drawTether(ctx: CanvasRenderingContext2D, camX: number, camY: number, reducedMotion: boolean): void {
+    const { pod } = this.dive;
+    const path = pod.tetherPath;
+    if (path.length < 2) return;
+    const now = performance.now();
+    const fuelRatio = Math.max(0, Math.min(1, pod.fuel / pod.maxFuel));
+    const strain = 1 - fuelRatio;
+
+    if (pod.endReason === 'fuel_out') {
+      if (this.tetherSnapTime === null) this.tetherSnapTime = now;
+    } else {
+      this.tetherSnapTime = null;
+    }
+    const snapT = this.tetherSnapTime === null ? -1 : (now - this.tetherSnapTime) / 1000;
+
+    // Break near the pod: the upper cable whips back up, the stub on the pod falls away
+    const breakIdx = snapT >= 0 ? Math.max(1, Math.floor(path.length * 0.85)) : path.length;
+    const tremble = !reducedMotion && strain > 0.7 && snapT < 0 ? (strain - 0.7) * 6 : 0;
+    const tension = Math.min(1, strain * 1.15);
+    const r = 255;
+    const g = Math.round(190 - tension * 140);
+    const b = Math.round(90 - tension * 40);
+    const core = `rgb(${r},${g},${b})`;
+
+    const trace = (from: number, to: number, lift: number, endAtPod: boolean): void => {
+      // Curve through segment midpoints so the cable reads as rope, not a zigzag
+      const pts: { x: number; y: number }[] = [];
+      for (let i = from; i < to; i++) {
+        const p = path[i];
+        const wob = tremble ? Math.sin(now / 28 + i * 1.7) * tremble : 0;
+        pts.push({ x: p.x - camX + wob, y: p.y - camY - lift * (i / Math.max(1, to)) });
+      }
+      if (endAtPod) pts.push({ x: pod.x - camX, y: pod.y - camY });
+      ctx.beginPath();
+      if (pts.length === 0) return;
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length - 1; i++) {
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2);
+      }
+      const end = pts[pts.length - 1];
+      ctx.lineTo(end.x, end.y);
+    };
+
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    const lift = snapT >= 0 ? Math.min(1, snapT * 2.2) * 120 : 0;
+    const upperAlpha = snapT >= 0 ? Math.max(0, 1 - snapT * 1.1) : 1;
+    ctx.globalAlpha = upperAlpha;
+    trace(0, breakIdx, lift, snapT < 0);
+    ctx.strokeStyle = 'rgba(8, 6, 14, 0.85)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(${r},${g},${b},0.22)`;
+    ctx.lineWidth = 9;
+    ctx.stroke();
+    ctx.strokeStyle = core;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    // Winching: bright pulses travel up the cable
+    if (pod.extractProgress > 0 && snapT < 0) {
+      ctx.setLineDash([10, 26]);
+      ctx.lineDashOffset = now / 12;
+      ctx.strokeStyle = '#fff6d8';
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = Math.min(1, 0.4 + pod.extractProgress);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (snapT >= 0) {
+      // The stub still clipped to the pod drops and fades
+      ctx.globalAlpha = Math.max(0, 1 - snapT * 1.6);
+      ctx.translate(0, snapT * snapT * 160);
+      trace(breakIdx - 1, path.length, 0, true);
+      ctx.strokeStyle = core;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+
+      if (!this.tetherSparked) {
+        this.tetherSparked = true;
+        const bp = path[breakIdx - 1];
+        this.game.particles.spawnRockSparks(bp.x, bp.y, '#ffd27a', 14);
+      }
+    } else {
+      this.tetherSparked = false;
+    }
+    ctx.restore();
+  }
+
   public render(): void {
     const { world, pod } = this.dive;
     const pointer = this.dive.pointer();
@@ -332,7 +448,7 @@ export class DiveRenderer {
         } else if (b.type === 'core') {
           const coreTile = this.game.atlas.coreTiles.get(planet.id);
           if (coreTile) this.game.atlas.drawTile(ctx, coreTile, sx, sy);
-          const pulse = 0.2 + Math.sin(pod.animTime * 6 + gx) * 0.12;
+          const pulse = 0.12 + this.dive.heartPulse * 0.4 + Math.sin(pod.animTime * 2 + gx) * 0.04;
           ctx.fillStyle = planet.coreGlowColor;
           ctx.globalAlpha = pulse;
           ctx.fillRect(sx, sy, T, T);
@@ -384,6 +500,7 @@ export class DiveRenderer {
     // 2b. Darkness that deepens with depth, cut open by the pod's lamp and by glowing pickups
     this.drawLighting(ctx, w, h, dpr, camX, camY, stratumIndex, startGx, endGx, startGy, endGy);
     this.drawNeonPass(ctx, camX, camY, startGx, endGx, startGy, endGy);
+    this.drawHeartGlow(ctx, w, h, pod.depthMeters / planet.maxDepth, planet.coreGlowColor);
 
     // 3. Draw Planet Core Integrity Bar when approaching the Core
     if (pod.depthMeters >= planet.maxDepth - 140) {
@@ -489,17 +606,8 @@ export class DiveRenderer {
       }
     }
 
-    // 6. Draw Winch Tether Cable from surface when Extracting
-    if (pod.extractProgress > 0) {
-      ctx.strokeStyle = '#00e5ff';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([8, 6]);
-      ctx.beginPath();
-      ctx.moveTo(pod.x - camX, 0);
-      ctx.lineTo(pod.x - camX, pod.y - camY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
+    // 6. The tether: cable from the derrick down the tunnel to the pod
+    this.drawTether(ctx, camX, camY, reducedMotion);
 
     // 7. Draw 7-Layer Modular Player Drill Pod
     const podScreenX = pod.x - camX;

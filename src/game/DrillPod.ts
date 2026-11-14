@@ -57,6 +57,11 @@ export class DrillPod {
   /** Charges from drilled Extraction Beacons; holding Extract with one skips the winch wait. */
   public beaconCharges = 0;
   public events: DiveEvent[] = [];
+  /**
+   * The tether: world points from the derrick's sheave down the tunnel to the pod.
+   * The pod drags it behind as it digs; the renderer draws it, and it snaps on a fuel-out.
+   */
+  public tetherPath: { x: number; y: number }[] = [];
 
   constructor(stats: ComputedPlayerStats) {
     this.x = (WORLD_COLS / 2) * TILE_SIZE;
@@ -64,6 +69,24 @@ export class DrillPod {
     this.maxFuel = stats.maxFuel;
     this.fuel = stats.maxFuel;
     this.maxCargo = stats.maxCargo;
+    this.tetherPath = [
+      { x: this.x, y: -40 },
+      { x: this.x, y: this.y },
+    ];
+  }
+
+  /** Lay cable behind the pod: a new point every ~half tile it travels, thinned when it gets long. */
+  private layTether(): void {
+    const path = this.tetherPath;
+    const last = path[path.length - 1];
+    if (Math.hypot(this.x - last.x, this.y - last.y) < TILE_SIZE * 0.5) return;
+    path.push({ x: this.x, y: this.y });
+    if (path.length > 800) {
+      // Keep the anchor and the newest stretch, halve the detail of the old cable
+      const kept = [path[0]];
+      for (let i = 1; i < path.length - 200; i += 2) kept.push(path[i]);
+      this.tetherPath = kept.concat(path.slice(path.length - 200));
+    }
   }
 
   public update(
@@ -248,6 +271,7 @@ export class DrillPod {
     if (this.y > maxWorldY) this.y = maxWorldY;
 
     this.depthMeters = Math.max(0, Math.floor((this.y / TILE_SIZE) * METERS_PER_ROW));
+    this.layTether();
     if (this.depthMeters > this.maxDepthReached) {
       this.maxDepthReached = this.depthMeters;
     }
@@ -273,7 +297,7 @@ export class DrillPod {
       this.fuel = 0;
       this.endReason = 'fuel_out';
       this.screenShake = 10;
-      sound.playSurfaceExtract(false);
+      sound.playTetherSnap();
     }
   }
 
